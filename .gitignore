@@ -1,0 +1,22 @@
+# Zephyr build output
+build/
+.west/
+
+# West managed modules (fetched via west update)
+zephyr/
+modules/
+bootloader/
+tools/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code lokale Einstellungen (umgebungsspezifisch)
+.claude/settings.local.json

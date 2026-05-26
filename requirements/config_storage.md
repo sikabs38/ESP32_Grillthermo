@@ -1,0 +1,214 @@
+# Requirements: Konfigurationsspeicher
+
+## 1. Übersicht
+
+Die Systemkonfiguration (WiFi, MQTT, Systemparameter) soll dauerhaft in einem nichtflüchtigen Speicher abgelegt werden, sodass sie nach einem Neustart oder Stromausfall erhalten bleibt. Als Speichermedium wird der interne Flash-Speicher des ESP32-S3 über das Zephyr NVS-Subsystem (Non-Volatile Storage) genutzt.
+
+---
+
+## 2. Funktionale Anforderungen
+
+### CFG-REQ-01
+
+#### Beschreibung
+
+Das System soll die Konfiguration beim Schreiben eines Parameters automatisch im nichtflüchtigen Speicher sichern. Ein expliziter Speicherbefehl durch den Nutzer ist nicht erforderlich.
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Hoch      | Offen  |                 |
+
+#### Abhängigkeiten
+
+Keine.
+
+#### Abnahmekriterien
+
+- Nach dem Setzen eines Parameters via Shell ist dieser nach einem Neustart weiterhin vorhanden
+- Der Schreibvorgang wird vor der Bestätigungsausgabe an den Nutzer abgeschlossen
+
+---
+
+### CFG-REQ-02
+
+#### Beschreibung
+
+Das System soll beim Start die gespeicherte Konfiguration automatisch aus dem nichtflüchtigen Speicher laden und anwenden.
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Hoch      | Offen  |                 |
+
+#### Abhängigkeiten
+
+- CFG-REQ-01
+
+#### Abnahmekriterien
+
+- Nach einem Neustart sind alle zuvor gespeicherten Parameter ohne Nutzerinteraktion aktiv
+- Fehlt ein Parameter im Speicher, wird ein definierter Standardwert verwendet
+- Der Ladevorgang erfolgt vor der Initialisierung der abhängigen Subsysteme (WiFi, MQTT)
+
+---
+
+### CFG-REQ-03
+
+#### Beschreibung
+
+Das System soll die Konfiguration über die Shell auf die Werkseinstellungen zurücksetzen können. Dabei werden alle gespeicherten Parameter gelöscht und auf ihre Standardwerte zurückgesetzt. Die PIN wird auf den Initialisierungswert `000000` zurückgesetzt.
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Mittel    | In Bearbeitung | `app/src/shell.c:Shell_CmdConfigReset()` (PIN-Reset umgesetzt; NVS-Löschung ausstehend: CFG-REQ-01) |
+
+#### Abhängigkeiten
+
+- CFG-REQ-01
+- CFG-REQ-04 (Parameterliste mit Standardwerten)
+- SHL-REQ-01 (Shell über USB, siehe `shell.md`)
+- SHL-REQ-06 (PIN-Schutz, siehe `shell.md`)
+
+#### Abnahmekriterien
+
+- Der Befehl `config reset` setzt alle Parameter aus CFG-REQ-04 auf ihre definierten Standardwerte
+- Die PIN wird auf `000000` zurückgesetzt
+- Nach einem anschließenden Neustart sind ausschließlich Standardwerte aktiv
+- Beim nächsten Login erscheint der Hinweis zur PIN-Änderung gemäß SHL-REQ-06
+- Der Nutzer wird vor dem Reset zur Bestätigung aufgefordert (`Ja` / `j` erforderlich)
+
+---
+
+### CFG-REQ-04
+
+#### Beschreibung
+
+Das System soll folgende Konfigurationsparameter persistent speichern:
+
+| Parameter       | Typ     | Max. Länge  | Standardwert | Verschlüsselt |
+|-----------------|---------|-------------|--------------|---------------|
+| WiFi SSID       | String  | 32 Zeichen  | `[leer]`     | Nein          |
+| WiFi Passwort   | String  | 64 Zeichen  | `[leer]`     | Ja (AES)      |
+| MQTT Broker     | String  | 128 Zeichen | `[leer]`     | Nein          |
+| MQTT Port       | uint16  | —           | `1883`       | Nein          |
+| Shell-PIN       | String  | 4–6 Ziffern | `000000`     | Ja (AES)      |
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Hoch      | In Bearbeitung | `app/src/shell.c:g_Pin`, `PIN_DEFAULT`, `PIN_BUF_SIZE` (nur Shell-PIN; NVS-Persistenz für alle Parameter ausstehend: CFG-REQ-01) |
+
+#### Abhängigkeiten
+
+- CFG-REQ-01
+
+#### Abnahmekriterien
+
+- Alle aufgelisteten Parameter werden korrekt gespeichert und geladen
+- Werte außerhalb der definierten Grenzen werden abgewiesen
+
+---
+
+### CFG-REQ-05
+
+#### Beschreibung
+
+Passwörter (WiFi, zukünftige Zugangsdaten) sollen vor dem Schreiben in den nichtflüchtigen Speicher mit AES verschlüsselt werden. Im Klartext darf ein Passwort ausschließlich im flüchtigen RAM während der Laufzeit vorliegen.
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Hoch      | Offen  |                 |
+
+#### Abhängigkeiten
+
+- CFG-REQ-01 (Speichern der Konfiguration)
+- CFG-REQ-02 (Laden der Konfiguration)
+
+#### Abnahmekriterien
+
+- Im NVS gespeicherte Passwörter sind AES-verschlüsselt und nicht im Klartext auslesbar
+- Der AES-Schlüssel ist nicht im Flash gespeichert (z.B. aus dem ESP32-S3 eFuse oder einem festen Compile-Zeit-Secret abgeleitet)
+- Nach dem Laden aus dem NVS wird das Passwort im RAM entschlüsselt und nach Verwendung gelöscht (`memset`)
+- Die AES-Implementierung nutzt Zephyr MbedTLS (`CONFIG_MBEDTLS=y`)
+
+---
+
+## 3. Nicht-funktionale Anforderungen
+
+### CFG-NFR-01
+
+#### Beschreibung
+
+Die Implementierung des Konfigurationsspeichers soll das Zephyr-NVS-Subsystem (Non-Volatile Storage) verwenden. Es darf kein direkter Zugriff auf Flash-Register erfolgen.
+
+| Priorität | Kategorie   | Status | Implementierung |
+|-----------|-------------|--------|-----------------|
+| Hoch      | Wartbarkeit | Offen  |                 |
+
+#### Abhängigkeiten
+
+Keine.
+
+#### Abnahmekriterien
+
+- Ausschließliche Nutzung der Zephyr-NVS-API (`nvs_write`, `nvs_read`, `nvs_delete`)
+- Kein direkter Zugriff auf Flash-Adressen oder ESP32-spezifische Register
+
+---
+
+### CFG-NFR-02
+
+#### Beschreibung
+
+Der Konfigurationsspeicher soll MISRA-C-konform implementiert sein. Dynamische Speicherverwaltung ist nicht erlaubt.
+
+| Priorität | Kategorie    | Status | Implementierung |
+|-----------|--------------|--------|-----------------|
+| Hoch      | Wartbarkeit  | Offen  |                 |
+
+#### Abhängigkeiten
+
+Keine.
+
+#### Abnahmekriterien
+
+- Kein Verstoß gegen MISRA C bei Prüfung mit `cppcheck --addon=misra`
+- Alle Puffer sind statisch alloziert
+
+---
+
+### CFG-NFR-03
+
+#### Beschreibung
+
+Ein Lese- oder Schreibfehler im nichtflüchtigen Speicher darf nicht zum Absturz des Systems führen. Fehler sollen geloggt und mit Standardwerten überbrückt werden.
+
+| Priorität | Kategorie        | Status | Implementierung |
+|-----------|------------------|--------|-----------------|
+| Hoch      | Zuverlässigkeit  | Offen  |                 |
+
+#### Abhängigkeiten
+
+- CFG-REQ-02
+
+#### Abnahmekriterien
+
+- Bei Lesefehler wird der Standardwert des betroffenen Parameters verwendet
+- Der Fehler wird über das Zephyr-Logging-Subsystem als `LOG_ERR` ausgegeben
+- Das System startet trotz Speicherfehler vollständig durch
+
+---
+
+## 4. Offene Punkte / Annahmen
+
+- [ ] NVS-Partition muss in der Partition-Tabelle des ESP32-S3 definiert werden (DTS-Overlay)
+- [x] Verschlüsselung des WiFi-Passworts im Flash: AES, siehe CFG-REQ-05
+- [ ] Flash-Verschleiß (Write Cycles) bei häufigen Schreibzugriffen nicht bewertet
+
+---
+
+## 5. Änderungshistorie
+
+| Version | Datum      | Autor | Änderung |
+|---------|------------|-------|----------|
+| 1.0     | 2026-05-26 |       | Erstellt |
+| 1.1     | 2026-05-26 |       | CFG-REQ-05 ergänzt: AES-Verschlüsselung für Passwörter |
+| 1.2     | 2026-05-26 |       | CFG-REQ-03 präzisiert: Reset setzt alle Parameter inkl. PIN auf Standardwerte; CFG-REQ-04: Shell-PIN als Parameter ergänzt |

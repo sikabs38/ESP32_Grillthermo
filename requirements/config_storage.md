@@ -16,7 +16,7 @@ Das System soll die Konfiguration beim Schreiben eines Parameters automatisch im
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Offen  |                 |
+| Hoch      | Implementiert | `app/src/config.c:Config_Save()` |
 
 #### Abhängigkeiten
 
@@ -37,7 +37,7 @@ Das System soll beim Start die gespeicherte Konfiguration automatisch aus dem ni
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Offen  |                 |
+| Hoch      | Implementiert | `app/src/config.c:Config_Load()`, `app/src/shell.c:Shell_LoadConfig()` (SYS_INIT APPLICATION) |
 
 #### Abhängigkeiten
 
@@ -59,7 +59,7 @@ Das System soll die Konfiguration über die Shell auf die Werkseinstellungen zur
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Mittel    | In Bearbeitung | `app/src/shell.c:Shell_CmdConfigReset()` (PIN-Reset umgesetzt; NVS-Löschung ausstehend: CFG-REQ-01) |
+| Mittel    | Implementiert | `app/src/config.c:Config_InvalidateAll()`, `app/src/shell.c:Shell_CmdConfigReset()` |
 
 #### Abhängigkeiten
 
@@ -94,7 +94,7 @@ Das System soll folgende Konfigurationsparameter persistent speichern:
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | In Bearbeitung | `app/src/shell.c:g_Pin`, `PIN_DEFAULT`, `PIN_BUF_SIZE` (nur Shell-PIN; NVS-Persistenz für alle Parameter ausstehend: CFG-REQ-01) |
+| Hoch      | Implementiert | `app/src/config.h:Config_Data_t`, `app/src/config.c:Config_GetDefaults()`, `app/src/shell.c:g_Config` |
 
 #### Abhängigkeiten
 
@@ -131,6 +131,34 @@ Passwörter (WiFi, zukünftige Zugangsdaten) sollen vor dem Schreiben in den nic
 
 ---
 
+### CFG-REQ-06
+
+#### Beschreibung
+
+Die Konfiguration soll in drei Generationen im nichtflüchtigen Speicher gespeichert werden. Jeder Datensatz wird mit einer CRC32-Prüfsumme abgesichert, die alle Felder des Datensatzes außer dem CRC-Feld selbst umfasst. Zusätzlich enthält jeder Datensatz ein Gültigkeitsflag. Ein ungültiger Datensatz hat `valid = false` und eine absichtlich falsche CRC.
+
+Beim Laden wird der neueste gültige Datensatz ausgewählt (höchste Generationsnummer mit korrekter CRC und `valid = true`). Die Generationsnummer ist ein `uint8_t` mit Überlaufbehandlung.
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Hoch      | Implementiert | `app/src/config.c:Config_Record_t`, `Config_ComputeCrc()`, `Config_IsRecordValid()`, `Config_FindNewest()` |
+
+#### Abhängigkeiten
+
+- CFG-REQ-01
+- CFG-REQ-02
+
+#### Abnahmekriterien
+
+- Es existieren genau drei NVS-Slots (IDs 1, 2, 3); Slot-Zuweisung per `generation % 3`
+- Jeder Datensatz enthält: `generation` (uint8_t), `valid` (bool), `data` (Config_Data_t), `crc` (uint32_t, letztes Feld)
+- CRC32 wird über alle Bytes von Datensatzbeginn bis ausschließlich des CRC-Feldes berechnet (`crc32_ieee`)
+- Beim Laden wird der Datensatz mit der höchsten gültigen Generationsnummer verwendet
+- Ein ungültiger Datensatz hat `valid = false` UND eine falsche CRC (korrekte CRC XOR 0xFFFFFFFF)
+- Die Generationsauswahl verwendet modularen `uint8_t`-Vergleich für Überlaufbehandlung
+
+---
+
 ## 3. Nicht-funktionale Anforderungen
 
 ### CFG-NFR-01
@@ -141,7 +169,7 @@ Die Implementierung des Konfigurationsspeichers soll das Zephyr-NVS-Subsystem (N
 
 | Priorität | Kategorie   | Status | Implementierung |
 |-----------|-------------|--------|-----------------|
-| Hoch      | Wartbarkeit | Offen  |                 |
+| Hoch      | Wartbarkeit | Implementiert | `app/src/config.c`: ausschließlich `nvs_mount`, `nvs_read`, `nvs_write` |
 
 #### Abhängigkeiten
 
@@ -183,7 +211,7 @@ Ein Lese- oder Schreibfehler im nichtflüchtigen Speicher darf nicht zum Absturz
 
 | Priorität | Kategorie        | Status | Implementierung |
 |-----------|------------------|--------|-----------------|
-| Hoch      | Zuverlässigkeit  | Offen  |                 |
+| Hoch      | Zuverlässigkeit  | Implementiert | `app/src/config.c:Config_Init()`, `Config_Load()`, `Config_Save()` — Fehler werden als `LOG_ERR` geloggt, Standardwerte verwendet |
 
 #### Abhängigkeiten
 
@@ -199,9 +227,10 @@ Ein Lese- oder Schreibfehler im nichtflüchtigen Speicher darf nicht zum Absturz
 
 ## 4. Offene Punkte / Annahmen
 
-- [ ] NVS-Partition muss in der Partition-Tabelle des ESP32-S3 definiert werden (DTS-Overlay)
+- [x] NVS-Partition: `storage_partition` bereits in Board-DTS (`partitions_0x0_amp_4M.dtsi`) bei 0x3B0000, 192 KB — kein DTS-Overlay erforderlich
 - [x] Verschlüsselung des WiFi-Passworts im Flash: AES, siehe CFG-REQ-05
 - [ ] Flash-Verschleiß (Write Cycles) bei häufigen Schreibzugriffen nicht bewertet
+- [ ] CFG-REQ-05 (AES-Verschlüsselung) noch nicht implementiert; TODO-Marker in `config.h` und `shell.c`
 
 ---
 
@@ -212,3 +241,4 @@ Ein Lese- oder Schreibfehler im nichtflüchtigen Speicher darf nicht zum Absturz
 | 1.0     | 2026-05-26 |       | Erstellt |
 | 1.1     | 2026-05-26 |       | CFG-REQ-05 ergänzt: AES-Verschlüsselung für Passwörter |
 | 1.2     | 2026-05-26 |       | CFG-REQ-03 präzisiert: Reset setzt alle Parameter inkl. PIN auf Standardwerte; CFG-REQ-04: Shell-PIN als Parameter ergänzt |
+| 1.3     | 2026-05-27 |       | CFG-REQ-06 ergänzt: 3-Generationen-Speicher mit CRC32 und Gültigkeitsflag; Implementierungsstatus aktualisiert |

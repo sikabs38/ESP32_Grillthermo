@@ -6,5 +6,6 @@ project(grill_buddy)
 
 target_sources(app PRIVATE
     src/main.c
+    src/config.c
     src/shell.c
 )

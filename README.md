@@ -74,9 +74,13 @@ west update
 ### Firmware bauen
 
 ```bash
-cd app
-west build -b esp32s3_devkitc/esp32s3/procpu --cmake-only
-west build
+west build -b esp32s3_devkitc/esp32s3/procpu app/
+```
+
+### Firmware komplett neu bauen
+
+```bash
+west build -p always -b esp32s3_devkitc/esp32s3/procpu app/
 ```
 
 ### Firmware flashen

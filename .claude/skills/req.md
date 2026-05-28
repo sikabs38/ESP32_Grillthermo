@@ -28,7 +28,7 @@ Erstelle oder erweitere eine Requirements-Datei für eine Komponente des Firmwar
 
 ## Wann verwenden
 
-TRIGGER: Nutzer ruft `/req` auf oder möchte Anforderungen für eine Komponente erfassen bzw. ergänzen.
+TRIGGER: Nutzer ruft `/ref` auf oder möchte Anforderungen für eine Komponente erfassen bzw. ergänzen.
 
 SKIP: Allgemeine Fragen, Code-Implementierung ohne explizite Anforderungserfassung.
 
@@ -36,7 +36,7 @@ SKIP: Allgemeine Fragen, Code-Implementierung ohne explizite Anforderungserfassu
 
 1. Komponentenname aus dem Aufruf übernehmen
 2. Präfix aus den ersten drei Buchstaben ableiten (z.B. `Sensor` → `SEN`)
-3. Datei unter `requirements/<komponente>.md` anlegen oder öffnen
+3. Datei unter `doc/requirements/<komponente>.md` anlegen oder öffnen
 4. Nächste freie ID vergeben nach Schema `<PRÄFIX>-REQ-<NR>` für funktionale (z.B. `SEN-REQ-01`) und `<PRÄFIX>-NFR-<NR>` für nicht-funktionale Anforderungen (z.B. `SEN-NFR-01`) — jeweils eigener, zweistelliger Zähler
 5. Anforderungen in funktionale und nicht-funktionale aufteilen
 6. Abnahmekriterien für jede Anforderung formulieren

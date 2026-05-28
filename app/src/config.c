@@ -10,7 +10,7 @@
 #include <string.h>
 #include <errno.h>
 
-LOG_MODULE_REGISTER(config_store, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(config_store, LOG_LEVEL_ERR);
 
 /* CFG-NFR-01: Ausschliesslich Zephyr NVS API, kein direkter Flash-Zugriff */
 /* CFG-NFR-02: Alle Puffer statisch alloziert, keine dynamische Speicherverwaltung */
@@ -82,11 +82,12 @@ static int Config_FindNewest(const Config_Record_t records[NVS_SLOT_COUNT])
 /* CFG-REQ-02: Konfiguration aus NVS laden; bei Fehler Standardwerte verwenden */
 int Config_Load(Config_Data_t *data)
 {
-    Config_Record_t records[NVS_SLOT_COUNT];
-    uint16_t        id;
-    int             newestIdx;
-    ssize_t         rc;
-    size_t          i;
+    /* Statisch alloziert: 732 Byte; verhindert Stack-Ueberlauf auf dem Shell-Thread */
+    static Config_Record_t records[NVS_SLOT_COUNT];
+    uint16_t               id;
+    int                    newestIdx;
+    ssize_t                rc;
+    size_t                 i;
 
     if (data == NULL) {
         return -EINVAL;
@@ -129,12 +130,13 @@ int Config_Load(Config_Data_t *data)
  * Schreibvorgang wird vor der Rueckkehr abgeschlossen (kein Hintergrundpuffer). */
 int Config_Save(const Config_Data_t *data)
 {
-    Config_Record_t records[NVS_SLOT_COUNT];
-    Config_Record_t newRecord;
-    uint16_t        writeId;
-    int             newestIdx;
-    ssize_t         rc;
-    size_t          i;
+    /* Statisch alloziert: 976 Byte gesamt; verhindert Stack-Ueberlauf auf dem Shell-Thread */
+    static Config_Record_t records[NVS_SLOT_COUNT];
+    static Config_Record_t newRecord;
+    uint16_t               writeId;
+    int                    newestIdx;
+    ssize_t                rc;
+    size_t                 i;
 
     if (data == NULL) {
         return -EINVAL;

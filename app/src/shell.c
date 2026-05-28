@@ -1,20 +1,58 @@
-/* SHL-REQ-01, SHL-REQ-06: PIN-geschuetzter Shell-Zugang ueber USB CDC-ACM */
+/* SHL-REQ-01, SHL-REQ-06, SHL-REQ-07, SHL-REQ-08: Shell, Login, Bootmeldung, Bootloader */
 #include "config.h"
+#include "wifi.h"
 
 #include <zephyr/kernel.h>
 #include <zephyr/init.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/shell/shell.h>
+#include <zephyr/shell/shell_uart.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/version.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 
-LOG_MODULE_REGISTER(grill_shell, LOG_LEVEL_INF);
+/* SHL-REQ-08: ESP32-S3 RTC-Register fuer ROM-Bootloader (Download-Modus).
+ * Adressen gemaess ESP32-S3 Technical Reference Manual, Kap. 7.
+ * MISRA 11.4 Abweichung: Hardware-Registerzugriff erfordert Integer-zu-Pointer-Cast. */
+#define ESP32S3_RTC_CNTL_BASE         (0x60008000UL)
+#define ESP32S3_RTC_CNTL_OPTIONS0_REG (ESP32S3_RTC_CNTL_BASE + 0x000UL)
+#define ESP32S3_RTC_CNTL_OPTION1_REG  (ESP32S3_RTC_CNTL_BASE + 0x12CUL)
+#define ESP32S3_SW_SYS_RST            (1UL << 31U)
+#define ESP32S3_FORCE_DOWNLOAD_BOOT   (1UL)
+
+LOG_MODULE_REGISTER(grill_shell, LOG_LEVEL_ERR);
+
+/* SHL-REQ-07: CPU-Taktfrequenz in MHz zur Anzeige in der Bootmeldung */
+#define BOOT_CPU_FREQ_MHZ ((unsigned int)(CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC / 1000000U))
+
+/* SHL-REQ-07: CDC-ACM-Geraet fuer DTR-Erkennung (Verbindungsaufbau) */
+static const struct device *const g_ShellUartDev =
+    DEVICE_DT_GET(DT_CHOSEN(zephyr_shell_uart));
 
 /* CFG-REQ-02, CFG-REQ-04: Aktive Konfiguration im RAM; aus NVS geladen beim Start */
 static Config_Data_t g_Config;
 /* SHL-REQ-06: Authentifizierungsstatus der aktiven Shell-Sitzung */
-static bool          g_Authenticated = false;
+static bool          g_Authenticated     = false;
+/* SHL-REQ-06: Puffer fuer PIN-Eingabe im Login-Bypass */
+static char          g_PinBuf[CFG_PIN_BUF_SIZE];
+static size_t        g_PinBufLen         = 0U;
+/* SHL-REQ-06: Verhindert doppelten "login: " Prompt */
+static bool          g_LoginPromptPrinted = false;
+/* SHL-REQ-07: DTR-Zustand des vorherigen Poll-Zyklus; Arbeitseinheit fuer DTR-Polling */
+static bool                    g_PrevDtr = false;
+static struct k_work_delayable g_DtrWork;
+/* SHL-REQ-08: Puffer fuer PIN-Eingabe im Bootloader-Bypass */
+static char   g_BootPinBuf[CFG_PIN_BUF_SIZE];
+static size_t g_BootPinBufLen        = 0U;
+static bool   g_BootPinPromptPrinted = false;
+/* SHL-REQ-02: Zwischenspeicher fuer SSID; Passworteingabe-Puffer im WiFi-Bypass */
+static char   g_WifiSsidStaging[CFG_WIFI_SSID_MAX_LEN + 1U];
+static char   g_WifiPassBuf[CFG_WIFI_PASS_MAX_LEN + 1U];
+static size_t g_WifiPassBufLen = 0U;
+/* WIF-REQ-06: Hostname */
+static char   g_WifiHostnameBuf[CFG_WIFI_HOSTNAME_MAX_LEN + 1U];
 
 /* ------------------------------------------------------------------ */
 /* Hilfsfunktionen                                                     */
@@ -55,7 +93,7 @@ static bool Shell_PinIsDefault(void)
 static bool Shell_CheckAuth(const struct shell *sh)
 {
     if (!g_Authenticated) {
-        shell_error(sh, "Zugang verweigert. Bitte mit \"login <pin>\" anmelden.");
+        shell_error(sh, "Zugang verweigert. Bitte zuerst anmelden.");
         return false;
     }
 
@@ -81,45 +119,217 @@ static int Shell_PinStore(const char *newPin)
 }
 
 /* ------------------------------------------------------------------ */
-/* login / logout                                         SHL-REQ-06  */
+/* Bootmeldung                                            SHL-REQ-07  */
 /* ------------------------------------------------------------------ */
 
-static int Shell_CmdLogin(const struct shell *sh, size_t argc, char **argv)
+/* SHL-REQ-07: Bootmeldung via printk — aufrufbar ausserhalb Shell-Kontext */
+static void Shell_PrintBanner(void)
 {
-    if (argc != 2) {
-        shell_error(sh, "Verwendung: login <pin>");
-        return -EINVAL;
-    }
-
-    if (strncmp(argv[1], g_Config.pin, CFG_PIN_BUF_SIZE) != 0) {
-        shell_error(sh, "Falsche PIN. Zugang verweigert.");
-        g_Authenticated = false;
-        return -EACCES;
-    }
-
-    g_Authenticated = true;
-    shell_obscure_set(sh, false);
-    shell_print(sh, "Anmeldung erfolgreich.");
-
-    if (Shell_PinIsDefault()) {
-        shell_warn(sh,
-            "Warnung: Standard-PIN aktiv. "
-            "Bitte mit \"config pin 000000 <neue-pin>\" aendern.");
-    }
-
-    return 0;
+    printk("\n"
+           "=========================\n"
+           "===    Grill Buddy    ===\n"
+           "=== Temperaturmonitor ===\n"
+           "=========================\n"
+           "Zephyr OS: " KERNEL_VERSION_STRING "\n"
+           "CPU:       ESP32-S3 (Xtensa LX7)\n");
+    printk("Takt:      %u MHz\n"
+           "-------------------------\n",
+           BOOT_CPU_FREQ_MHZ);
 }
+
+/* SHL-REQ-07: Bootmeldung via shell_fprintf — fuer Shell-Kontext (z.B. logout) */
+static void Shell_PrintBannerShell(const struct shell *sh)
+{
+    shell_fprintf(sh, SHELL_NORMAL,
+                  "\n"
+                  "=========================\n"
+                  "===    Grill Buddy    ===\n"
+                  "=== Temperaturmonitor ===\n"
+                  "=========================\n"
+                  "Zephyr OS: " KERNEL_VERSION_STRING "\n"
+                  "CPU:       ESP32-S3 (Xtensa LX7)\n");
+    shell_fprintf(sh, SHELL_NORMAL,
+                  "Takt:      %u MHz\n"
+                  "-------------------------\n",
+                  BOOT_CPU_FREQ_MHZ);
+}
+
+/* SHL-REQ-07: DTR-Polling — erkennt Verbindungsaufbau (0->1 Flanke) */
+static void Shell_DtrWork(struct k_work *work)
+{
+    int  dtr     = 0;
+    bool currDtr = false;
+    int  rc;
+
+    ARG_UNUSED(work);
+
+    rc = uart_line_ctrl_get(g_ShellUartDev, UART_LINE_CTRL_DTR, &dtr);
+    if (rc == 0) {
+        currDtr = (bool)(dtr != 0);
+        if (currDtr && !g_PrevDtr) {
+            Shell_PrintBanner();
+            g_LoginPromptPrinted = false;
+        }
+        g_PrevDtr = currDtr;
+    }
+
+    (void)k_work_reschedule(&g_DtrWork, K_MSEC(200));
+}
+
+/* ------------------------------------------------------------------ */
+/* Login-Bypass                                           SHL-REQ-06  */
+/* ------------------------------------------------------------------ */
+
+/* SHL-REQ-06: Bypass-Callback — empfaengt alle Eingaben vor der Shell-Verarbeitung.
+ * Zeigt "login: " als Prompt und verdeckt PIN-Zeichen mit '*'.              */
+static void Shell_LoginBypass(const struct shell *sh, uint8_t *data,
+                              size_t len, void *user_data)
+{
+    size_t i;
+
+    ARG_UNUSED(user_data);
+
+    if (!g_LoginPromptPrinted) {
+        shell_fprintf(sh, SHELL_NORMAL, "login: ");
+        g_LoginPromptPrinted = true;
+    }
+
+    for (i = 0U; i < len; i++) {
+        uint8_t c = data[i];
+
+        if ((c == (uint8_t)'\r') || (c == (uint8_t)'\n')) {
+            g_PinBuf[g_PinBufLen] = '\0';
+            shell_fprintf(sh, SHELL_NORMAL, "\n");
+
+            if (strncmp(g_PinBuf, g_Config.pin, CFG_PIN_BUF_SIZE) == 0) {
+                g_Authenticated = true;
+                g_PinBufLen     = 0U;
+                (void)shell_obscure_set(sh, false);
+                (void)shell_prompt_change(sh, "Grillbuddy: ");
+                shell_set_bypass(sh, NULL, NULL);
+                shell_print(sh, "Anmeldung erfolgreich.");
+                if (Shell_PinIsDefault()) {
+                    shell_warn(sh,
+                        "Warnung: Standard-PIN aktiv. "
+                        "Bitte mit \"config pin 000000 <neue-pin>\" aendern.");
+                }
+                return;
+            }
+
+            shell_print(sh, "Falsche PIN. Zugang verweigert.");
+            g_PinBufLen = 0U;
+            shell_fprintf(sh, SHELL_NORMAL, "login: ");
+
+        } else if ((c == (uint8_t)'\b') || (c == 0x7fU)) {
+            if (g_PinBufLen > 0U) {
+                g_PinBufLen--;
+                shell_fprintf(sh, SHELL_NORMAL, "\b \b");
+            }
+        } else if (g_PinBufLen < (CFG_PIN_BUF_SIZE - 1U)) {
+            g_PinBuf[g_PinBufLen] = (char)c;
+            g_PinBufLen++;
+            shell_fprintf(sh, SHELL_NORMAL, "*");
+        } else {
+            /* Puffer voll; Zeichen ignorieren */
+        }
+    }
+}
+
+/* SHL-REQ-06: Login-Modus aktivieren — Bypass setzen und Zustand zuruecksetzen */
+static void Shell_LoginSetup(const struct shell *sh)
+{
+    g_Authenticated      = false;
+    g_PinBufLen          = 0U;
+    g_PinBuf[0]          = '\0';
+    g_LoginPromptPrinted = false;
+    shell_set_bypass(sh, Shell_LoginBypass, NULL);
+}
+
+/* ------------------------------------------------------------------ */
+/* logout                                                 SHL-REQ-06  */
+/* ------------------------------------------------------------------ */
 
 static int Shell_CmdLogout(const struct shell *sh, size_t argc, char **argv)
 {
     ARG_UNUSED(argc);
     ARG_UNUSED(argv);
 
-    g_Authenticated = false;
-    shell_obscure_set(sh, true);
     shell_print(sh, "Abgemeldet.");
+    Shell_PrintBannerShell(sh);
+    Shell_LoginSetup(sh);
+    shell_fprintf(sh, SHELL_NORMAL, "login: ");
+    g_LoginPromptPrinted = true;
 
     return 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* wifi set — Passwort-Bypass                             SHL-REQ-02  */
+/* ------------------------------------------------------------------ */
+
+/* SHL-REQ-02: Bypass-Callback — nimmt WiFi-Passwort verdeckt entgegen. */
+static void Shell_WifiPasswordBypass(const struct shell *sh, uint8_t *data,
+                                     size_t len, void *user_data)
+{
+    int    rc;
+    size_t i;
+
+    ARG_UNUSED(user_data);
+
+    for (i = 0U; i < len; i++) {
+        uint8_t c = data[i];
+
+        if ((c == (uint8_t)'\r') || (c == (uint8_t)'\n')) {
+            g_WifiPassBuf[g_WifiPassBufLen] = '\0';
+            shell_fprintf(sh, SHELL_NORMAL, "\n");
+
+            if (g_WifiPassBufLen == 0U) {
+                shell_error(sh, "Passwort darf nicht leer sein.");
+                g_WifiPassBufLen = 0U;
+                shell_fprintf(sh, SHELL_NORMAL, "Passwort: ");
+                return;
+            }
+
+            /* SSID und Passwort in Konfiguration uebernehmen */
+            (void)strncpy(g_Config.wifiSsid, g_WifiSsidStaging,
+                          CFG_WIFI_SSID_MAX_LEN);
+            g_Config.wifiSsid[CFG_WIFI_SSID_MAX_LEN] = '\0';
+            (void)strncpy(g_Config.wifiPassword, g_WifiPassBuf,
+                          CFG_WIFI_PASS_MAX_LEN);
+            g_Config.wifiPassword[CFG_WIFI_PASS_MAX_LEN] = '\0';
+            /* TODO: CFG-REQ-05 — Passwort vor dem Speichern AES-verschluesseln */
+
+            rc = Config_Save(&g_Config);
+
+            /* Bypass vor shell_print beenden, damit der Shell-Prompt korrekt erscheint */
+            g_WifiPassBufLen = 0U;
+            g_WifiPassBuf[0] = '\0';
+            (void)shell_obscure_set(sh, false);
+            shell_set_bypass(sh, NULL, NULL);
+
+            if (rc < 0) {
+                shell_error(sh, "Speicherfehler: %d", rc);
+            } else {
+                shell_print(sh, "WiFi SSID gesetzt: %s", g_Config.wifiSsid);
+                /* WIF-REQ-04: Neuen Verbindungsversuch ausloesen */
+                Wifi_Reconnect();
+            }
+
+            return;
+
+        } else if ((c == (uint8_t)'\b') || (c == 0x7fU)) {
+            if (g_WifiPassBufLen > 0U) {
+                g_WifiPassBufLen--;
+                shell_fprintf(sh, SHELL_NORMAL, "\b \b");
+            }
+        } else if (g_WifiPassBufLen < CFG_WIFI_PASS_MAX_LEN) {
+            g_WifiPassBuf[g_WifiPassBufLen] = (char)c;
+            g_WifiPassBufLen++;
+            shell_fprintf(sh, SHELL_NORMAL, "*");
+        } else {
+            /* Puffer voll (64 Zeichen); Zeichen ignorieren */
+        }
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -128,14 +338,12 @@ static int Shell_CmdLogout(const struct shell *sh, size_t argc, char **argv)
 
 static int Shell_CmdWifiSet(const struct shell *sh, size_t argc, char **argv)
 {
-    int rc;
-
     if (!Shell_CheckAuth(sh)) {
         return -EACCES;
     }
 
-    if (argc != 3) {
-        shell_error(sh, "Verwendung: wifi set <ssid> <password>");
+    if (argc != 2) {
+        shell_error(sh, "Verwendung: wifi set <ssid>");
         return -EINVAL;
     }
 
@@ -144,16 +352,47 @@ static int Shell_CmdWifiSet(const struct shell *sh, size_t argc, char **argv)
         return -EINVAL;
     }
 
-    if (strlen(argv[2]) > CFG_WIFI_PASS_MAX_LEN) {
-        shell_error(sh, "Passwort zu lang (max. %u Zeichen).", (unsigned int)CFG_WIFI_PASS_MAX_LEN);
+    /* SSID zwischenspeichern; Passwort wird im Bypass abgefragt */
+    (void)strncpy(g_WifiSsidStaging, argv[1], CFG_WIFI_SSID_MAX_LEN);
+    g_WifiSsidStaging[CFG_WIFI_SSID_MAX_LEN] = '\0';
+
+    g_WifiPassBufLen = 0U;
+    g_WifiPassBuf[0] = '\0';
+    (void)shell_obscure_set(sh, true);
+    shell_set_bypass(sh, Shell_WifiPasswordBypass, NULL);
+    shell_fprintf(sh, SHELL_NORMAL, "Passwort: ");
+
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* wifi hostname                                          WIF-REQ-06  */
+/* ------------------------------------------------------------------ */
+
+static int Shell_CmdWifiHostname(const struct shell *sh, size_t argc, char **argv)
+{
+    int rc;
+
+    if (!Shell_CheckAuth(sh)) {
+        return -EACCES;
+    }
+
+    if (argc != 2) {
+        shell_error(sh, "Verwendung: wifi hostname <name>");
         return -EINVAL;
     }
 
-    (void)strncpy(g_Config.wifiSsid, argv[1], CFG_WIFI_SSID_MAX_LEN);
-    g_Config.wifiSsid[CFG_WIFI_SSID_MAX_LEN] = '\0';
-    (void)strncpy(g_Config.wifiPassword, argv[2], CFG_WIFI_PASS_MAX_LEN);
-    g_Config.wifiPassword[CFG_WIFI_PASS_MAX_LEN] = '\0';
-    /* TODO: CFG-REQ-05 — Passwort vor dem Speichern AES-verschluesseln */
+    if (strlen(argv[1]) > CFG_WIFI_HOSTNAME_MAX_LEN) {
+        shell_error(sh, "Hostname zu lang (max. %u Zeichen).",
+                    (unsigned int)CFG_WIFI_HOSTNAME_MAX_LEN);
+        return -EINVAL;
+    }
+
+    (void)strncpy(g_WifiHostnameBuf, argv[1], CFG_WIFI_HOSTNAME_MAX_LEN);
+    g_WifiHostnameBuf[CFG_WIFI_HOSTNAME_MAX_LEN] = '\0';
+
+    (void)strncpy(g_Config.wifiHostname, g_WifiHostnameBuf, CFG_WIFI_HOSTNAME_MAX_LEN);
+    g_Config.wifiHostname[CFG_WIFI_HOSTNAME_MAX_LEN] = '\0';
 
     rc = Config_Save(&g_Config);
 
@@ -162,7 +401,9 @@ static int Shell_CmdWifiSet(const struct shell *sh, size_t argc, char **argv)
         return rc;
     }
 
-    shell_print(sh, "WiFi SSID gesetzt: %s", g_Config.wifiSsid);
+    shell_print(sh, "Hostname gesetzt: %s", g_Config.wifiHostname);
+    /* WIF-REQ-06: Verbindung neu aufbauen damit Hostname sofort per DHCP announciert wird */
+    Wifi_Reconnect();
 
     return 0;
 }
@@ -234,6 +475,8 @@ static int Shell_CmdConfigShow(const struct shell *sh, size_t argc, char **argv)
                 (g_Config.wifiSsid[0] != '\0') ? g_Config.wifiSsid : "[nicht gesetzt]");
     /* SHL-REQ-05, CFG-REQ-05: Passwort nie im Klartext ausgeben */
     shell_print(sh, "WiFi Passwort: ********");
+    shell_print(sh, "Hostname     : %s",
+                (g_Config.wifiHostname[0] != '\0') ? g_Config.wifiHostname : "[nicht gesetzt]");
     shell_print(sh, "MQTT Broker  : %s",
                 (g_Config.mqttBroker[0] != '\0') ? g_Config.mqttBroker : "[nicht gesetzt]");
     shell_print(sh, "MQTT Port    : %u", (unsigned int)g_Config.mqttPort);
@@ -316,26 +559,113 @@ static int Shell_CmdConfigReset(const struct shell *sh, size_t argc, char **argv
 }
 
 /* ------------------------------------------------------------------ */
+/* bootloader                                             SHL-REQ-08  */
+/* ------------------------------------------------------------------ */
+
+/* SHL-REQ-08: Bypass-Callback — nimmt PIN-Eingabe entgegen, wechselt bei
+ * korrekter PIN in den ROM-Download-Modus des ESP32-S3.               */
+static void Shell_BootloaderPinBypass(const struct shell *sh, uint8_t *data,
+                                      size_t len, void *user_data)
+{
+    /* MISRA 11.4: volatile-Pointer fuer Hardware-Registerzugriff */
+    volatile uint32_t *const opt0 = (volatile uint32_t *)ESP32S3_RTC_CNTL_OPTIONS0_REG;
+    volatile uint32_t *const opt1 = (volatile uint32_t *)ESP32S3_RTC_CNTL_OPTION1_REG;
+    size_t i;
+
+    ARG_UNUSED(user_data);
+
+    for (i = 0U; i < len; i++) {
+        uint8_t c = data[i];
+
+        if ((c == (uint8_t)'\r') || (c == (uint8_t)'\n')) {
+            g_BootPinBuf[g_BootPinBufLen] = '\0';
+            shell_fprintf(sh, SHELL_NORMAL, "\n");
+
+            if (strncmp(g_BootPinBuf, g_Config.pin, CFG_PIN_BUF_SIZE) == 0) {
+                shell_print(sh, "PIN korrekt. Wechsle in den Download-Modus ...");
+                /* SHL-REQ-08: FORCE_DOWNLOAD_BOOT setzen, dann SW-System-Reset.
+                 * memw: Xtensa-Speicherbarriere — sichert Commit vor Reset-Trigger. */
+                *opt1 = *opt1 | ESP32S3_FORCE_DOWNLOAD_BOOT;
+                __asm__ volatile("memw" ::: "memory");
+                *opt0 = *opt0 | ESP32S3_SW_SYS_RST;
+                /* Ab hier kein Rueckkehr */
+            } else {
+                shell_error(sh, "Falsche PIN. Vorgang abgebrochen.");
+            }
+
+            /* Bypass beenden (nur bei falscher PIN erreichbar) */
+            g_BootPinBufLen        = 0U;
+            g_BootPinBuf[0]        = '\0';
+            g_BootPinPromptPrinted = false;
+            (void)shell_obscure_set(sh, false);
+            shell_set_bypass(sh, NULL, NULL);
+            return;
+
+        } else if ((c == (uint8_t)'\b') || (c == 0x7fU)) {
+            if (g_BootPinBufLen > 0U) {
+                g_BootPinBufLen--;
+                shell_fprintf(sh, SHELL_NORMAL, "\b \b");
+            }
+        } else if (g_BootPinBufLen < (CFG_PIN_BUF_SIZE - 1U)) {
+            g_BootPinBuf[g_BootPinBufLen] = (char)c;
+            g_BootPinBufLen++;
+            shell_fprintf(sh, SHELL_NORMAL, "*");
+        } else {
+            /* Puffer voll; Zeichen ignorieren */
+        }
+    }
+}
+
+static int Shell_CmdBootloader(const struct shell *sh, size_t argc, char **argv)
+{
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+
+    if (!Shell_CheckAuth(sh)) {
+        return -EACCES;
+    }
+
+    g_BootPinBufLen        = 0U;
+    g_BootPinBuf[0]        = '\0';
+    g_BootPinPromptPrinted = true;
+    (void)shell_obscure_set(sh, true);
+    shell_set_bypass(sh, Shell_BootloaderPinBypass, NULL);
+    shell_fprintf(sh, SHELL_NORMAL, "Pin: ");
+
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
 /* Initialisierung                              CFG-REQ-02, SHL-REQ-01 */
 /* ------------------------------------------------------------------ */
 
 static int Shell_LoadConfig(void)
 {
-    int rc;
+    int                rc;
+    const struct shell *sh;
 
     rc = Config_Init();
 
     if (rc < 0) {
         LOG_ERR("Config-Initialisierungsfehler: %d; Standardwerte aktiv.", rc);
         Config_GetDefaults(&g_Config);
-        return 0; /* Fehler nicht weiterleiten; Shell bleibt funktionsfaehig */
+    } else {
+        rc = Config_Load(&g_Config);
+
+        if (rc != 0) {
+            LOG_WRN("Konfiguration nicht geladen (rc=%d); Standardwerte aktiv.", rc);
+        }
     }
 
-    rc = Config_Load(&g_Config);
-
-    if (rc != 0) {
-        LOG_WRN("Konfiguration nicht geladen (rc=%d); Standardwerte aktiv.", rc);
+    /* SHL-REQ-06: Login-Bypass vor erster Nutzereingabe aktivieren */
+    sh = shell_backend_uart_get_ptr();
+    if (sh != NULL) {
+        Shell_LoginSetup(sh);
     }
+
+    /* SHL-REQ-07: DTR-Polling starten — 500 ms Verzoegerung fuer USB-Initialisierung */
+    k_work_init_delayable(&g_DtrWork, Shell_DtrWork);
+    (void)k_work_schedule(&g_DtrWork, K_MSEC(500));
 
     return 0;
 }
@@ -346,8 +676,54 @@ SYS_INIT(Shell_LoadConfig, APPLICATION, 0);
 /* Befehlsbaum                                                        */
 /* ------------------------------------------------------------------ */
 
+static int Shell_CmdWifiReconnect(const struct shell *sh, size_t argc, char **argv)
+{
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+
+    if (!Shell_CheckAuth(sh)) {
+        return -EACCES;
+    }
+
+    Wifi_Reconnect();
+    shell_print(sh, "WiFi: Verbindungsversuch gestartet.");
+
+    return 0;
+}
+
+/* SHL-REQ-09, WIF-REQ-05: WiFi-Verbindungsstatus anzeigen */
+static int Shell_CmdWifiStatus(const struct shell *sh, size_t argc, char **argv)
+{
+    Wifi_Status_t status;
+
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+
+    if (!Shell_CheckAuth(sh)) {
+        return -EACCES;
+    }
+
+    Wifi_GetStatus(&status);
+
+    if (status.connected) {
+        shell_print(sh, "WiFi Status  : Verbunden");
+        shell_print(sh, "SSID         : %s", status.ssid);
+        shell_print(sh, "IP-Adresse   : %s", status.ip);
+    } else {
+        shell_print(sh, "WiFi Status  : Getrennt");
+        if (status.ssid[0] != '\0') {
+            shell_print(sh, "SSID         : %s", status.ssid);
+        }
+    }
+
+    return 0;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_wifi,
-    SHELL_CMD_ARG(set, NULL, "WiFi konfigurieren: <ssid> <password>", Shell_CmdWifiSet, 3, 0),
+    SHELL_CMD_ARG(set,      NULL, "WiFi konfigurieren: <ssid>",       Shell_CmdWifiSet,      2, 0),
+    SHELL_CMD_ARG(hostname, NULL, "Hostnamen setzen: <name>",         Shell_CmdWifiHostname, 2, 0),
+    SHELL_CMD_ARG(reconnect,NULL, "WiFi-Verbindung neu aufbauen",     Shell_CmdWifiReconnect,1, 0),
+    SHELL_CMD(    status,   NULL, "WiFi-Status anzeigen",             Shell_CmdWifiStatus),
     SHELL_SUBCMD_SET_END
 );
 
@@ -364,8 +740,8 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_config,
     SHELL_SUBCMD_SET_END
 );
 
-SHELL_CMD_REGISTER(login,  NULL,        "Anmelden: <pin>",      Shell_CmdLogin);
-SHELL_CMD_REGISTER(logout, NULL,        "Abmelden",             Shell_CmdLogout);
-SHELL_CMD_REGISTER(wifi,   &sub_wifi,   "WiFi-Konfiguration",   NULL);
-SHELL_CMD_REGISTER(mqtt,   &sub_mqtt,   "MQTT-Konfiguration",   NULL);
-SHELL_CMD_REGISTER(config, &sub_config, "Systemkonfiguration",  NULL);
+SHELL_CMD_REGISTER(logout,     NULL,        "Abmelden",                         Shell_CmdLogout);
+SHELL_CMD_REGISTER(wifi,       &sub_wifi,   "WiFi-Konfiguration",               NULL);
+SHELL_CMD_REGISTER(mqtt,       &sub_mqtt,   "MQTT-Konfiguration",               NULL);
+SHELL_CMD_REGISTER(config,     &sub_config, "Systemkonfiguration",              NULL);
+SHELL_CMD_REGISTER(bootloader, NULL,        "In Download-Modus wechseln",       Shell_CmdBootloader);

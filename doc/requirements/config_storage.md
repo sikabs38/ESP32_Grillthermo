@@ -16,7 +16,7 @@ Das System soll die Konfiguration beim Schreiben eines Parameters automatisch im
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Implementiert | `app/src/config.c:Config_Save()` |
+| Hoch      | Umgesetzt | `app/src/config.c:Config_Save()` |
 
 #### Abhängigkeiten
 
@@ -37,7 +37,7 @@ Das System soll beim Start die gespeicherte Konfiguration automatisch aus dem ni
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Implementiert | `app/src/config.c:Config_Load()`, `app/src/shell.c:Shell_LoadConfig()` (SYS_INIT APPLICATION) |
+| Hoch      | Umgesetzt | `app/src/config.c:Config_Load()`, `app/src/shell.c:Shell_LoadConfig()` (SYS_INIT APPLICATION) |
 
 #### Abhängigkeiten
 
@@ -59,7 +59,7 @@ Das System soll die Konfiguration über die Shell auf die Werkseinstellungen zur
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Mittel    | Implementiert | `app/src/config.c:Config_InvalidateAll()`, `app/src/shell.c:Shell_CmdConfigReset()` |
+| Mittel    | Umgesetzt | `app/src/config.c:Config_InvalidateAll()`, `app/src/shell.c:Shell_CmdConfigReset()` |
 
 #### Abhängigkeiten
 
@@ -74,7 +74,7 @@ Das System soll die Konfiguration über die Shell auf die Werkseinstellungen zur
 - Die PIN wird auf `000000` zurückgesetzt
 - Nach einem anschließenden Neustart sind ausschließlich Standardwerte aktiv
 - Beim nächsten Login erscheint der Hinweis zur PIN-Änderung gemäß SHL-REQ-06
-- Der Nutzer wird vor dem Reset zur Bestätigung aufgefordert (`Ja` / `j` erforderlich)
+- Der Nutzer wird vor dem Reset zur Bestätigung aufgefordert (`config reset confirm` erforderlich)
 
 ---
 
@@ -94,7 +94,7 @@ Das System soll folgende Konfigurationsparameter persistent speichern:
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Implementiert | `app/src/config.h:Config_Data_t`, `app/src/config.c:Config_GetDefaults()`, `app/src/shell.c:g_Config` |
+| Hoch      | Umgesetzt | `app/src/config.h:Config_Data_t`, `app/src/config.c:Config_GetDefaults()`, `app/src/shell.c:g_Config` |
 
 #### Abhängigkeiten
 
@@ -141,7 +141,7 @@ Beim Laden wird der neueste gültige Datensatz ausgewählt (höchste Generations
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Implementiert | `app/src/config.c:Config_Record_t`, `Config_ComputeCrc()`, `Config_IsRecordValid()`, `Config_FindNewest()` |
+| Hoch      | Umgesetzt | `app/src/config.c:Config_Record_t`, `Config_ComputeCrc()`, `Config_IsRecordValid()`, `Config_FindNewest()` |
 
 #### Abhängigkeiten
 
@@ -169,7 +169,7 @@ Die Implementierung des Konfigurationsspeichers soll das Zephyr-NVS-Subsystem (N
 
 | Priorität | Kategorie   | Status | Implementierung |
 |-----------|-------------|--------|-----------------|
-| Hoch      | Wartbarkeit | Implementiert | `app/src/config.c`: ausschließlich `nvs_mount`, `nvs_read`, `nvs_write` |
+| Hoch      | Wartbarkeit | Umgesetzt | `app/src/config.c`: ausschließlich `nvs_mount`, `nvs_read`, `nvs_write` |
 
 #### Abhängigkeiten
 
@@ -198,7 +198,7 @@ Keine.
 
 #### Abnahmekriterien
 
-- Kein Verstoß gegen MISRA C bei Prüfung mit `cppcheck --addon=misra`
+- Kein Verstoß gegen MISRA C 2023 bei Prüfung mit `cppcheck --addon=misra`
 - Alle Puffer sind statisch alloziert
 
 ---
@@ -211,7 +211,7 @@ Ein Lese- oder Schreibfehler im nichtflüchtigen Speicher darf nicht zum Absturz
 
 | Priorität | Kategorie        | Status | Implementierung |
 |-----------|------------------|--------|-----------------|
-| Hoch      | Zuverlässigkeit  | Implementiert | `app/src/config.c:Config_Init()`, `Config_Load()`, `Config_Save()` — Fehler werden als `LOG_ERR` geloggt, Standardwerte verwendet |
+| Hoch      | Zuverlässigkeit  | Umgesetzt | `app/src/config.c:Config_Init()`, `Config_Load()`, `Config_Save()` — Fehler werden als `LOG_ERR` geloggt, Standardwerte verwendet |
 
 #### Abhängigkeiten
 
@@ -242,3 +242,4 @@ Ein Lese- oder Schreibfehler im nichtflüchtigen Speicher darf nicht zum Absturz
 | 1.1     | 2026-05-26 |       | CFG-REQ-05 ergänzt: AES-Verschlüsselung für Passwörter |
 | 1.2     | 2026-05-26 |       | CFG-REQ-03 präzisiert: Reset setzt alle Parameter inkl. PIN auf Standardwerte; CFG-REQ-04: Shell-PIN als Parameter ergänzt |
 | 1.3     | 2026-05-27 |       | CFG-REQ-06 ergänzt: 3-Generationen-Speicher mit CRC32 und Gültigkeitsflag; Implementierungsstatus aktualisiert |
+| 1.4     | 2026-05-27 |       | Skill-Alignment: Status „Implementiert" → „Umgesetzt", MISRA C → MISRA C 2023, Bestätigungstext CFG-REQ-03 korrigiert |

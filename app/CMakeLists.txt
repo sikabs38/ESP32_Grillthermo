@@ -8,4 +8,9 @@ target_sources(app PRIVATE
     src/main.c
     src/config.c
     src/shell.c
+    src/wifi.c
+    src/webserver.c
+    src/temp_data.c
 )
+
+zephyr_linker_sources(SECTIONS sections-rom.ld)

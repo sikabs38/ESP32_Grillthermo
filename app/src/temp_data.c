@@ -11,7 +11,8 @@ K_CONDVAR_DEFINE(g_TempCondvar);
 uint32_t g_TempGen = 0U;
 
 /* TMP-REQ-01: Globale Temperaturdaten mit Initialisierungswerten.
- * Brenner: 20 °C / valid, Kern: 0 °C / ungueltig (→ Anzeige "--"). */
+ * Brenner: 20 °C / valid, Kern: 0 °C / ungueltig (→ Anzeige "--"),
+ * DSP-REQ-06: Gas: 0 % / ungueltig (→ Anzeige "--"). */
 Temp_Data_t g_TempData = {
     .burner = {
         { .value = (int16_t)20, .valid = true  },
@@ -25,6 +26,7 @@ Temp_Data_t g_TempData = {
         { .value = (int16_t)0, .valid = false },
         { .value = (int16_t)0, .valid = false },
     },
+    .gas = { .value = (int16_t)0, .valid = false },
 };
 
 /* TMP-REQ-03: Einzelwert setzen, Generation erhoehen, Warter wecken */
@@ -67,4 +69,21 @@ void Temp_NotifyChanged(void)
     g_TempGen++;
     (void)k_condvar_broadcast(&g_TempCondvar);
     (void)k_mutex_unlock(&g_TempMutex);
+}
+
+/* DSP-REQ-06: Gasfuellstand setzen — bei valid = true Bereich 0..100 % erforderlich */
+int Temp_SetGas(int16_t percent, bool valid)
+{
+    if (valid && ((percent < (int16_t)0) || (percent > (int16_t)100))) {
+        return -EINVAL;
+    }
+
+    (void)k_mutex_lock(&g_TempMutex, K_FOREVER);
+    g_TempData.gas.value = percent;
+    g_TempData.gas.valid = valid;
+    g_TempGen++;
+    (void)k_condvar_broadcast(&g_TempCondvar);
+    (void)k_mutex_unlock(&g_TempMutex);
+
+    return 0;
 }

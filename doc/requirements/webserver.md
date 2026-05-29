@@ -127,7 +127,7 @@ Der Webserver soll einen Server-Sent-Events-Endpoint (`/events`) bereitstellen, 
 
 Die Erkennung neuer Messwerte erfolgt über ein Änderungssignal des Temperaturdaten-Moduls: Der schreibende Erzeuger (künftig das Bluetooth-Modul) signalisiert nach jeder Aktualisierung von `g_TempData`, dass neue Werte vorliegen. Der SSE-Handler wartet auf dieses Signal, liest die Daten unter Mutex-Schutz und sendet sie.
 
-Die Werte werden als JSON-Objekt übertragen, das für die beiden Gruppen `burner` und `core` je vier Einträge mit Temperaturwert und Gültigkeitsflag enthält. Format (kompakt): `{"burner":[{"v":20,"ok":1},…×4],"core":[…]}` — `v` = Wert in °C, `ok` = 1 (gültig) bzw. 0 (`--`). Die Gruppe `target` wurde mit der Ablösung von WEB-REQ-05 durch DSP-REQ-01..04 entfernt.
+Die Werte werden als JSON-Objekt übertragen. Die beiden Gruppen `burner` und `core` enthalten je vier Einträge (Temperaturwert in °C, Gültigkeitsflag), das Feld `gas` enthält einen einzelnen Eintrag (Füllstand in %, DSP-REQ-06). Format (kompakt): `{"burner":[{"v":20,"ok":1},…×4],"core":[…],"gas":{"v":75,"ok":1}}` — `v` = Wert, `ok` = 1 (gültig) bzw. 0 (`--`). Die Gruppe `target` wurde mit der Ablösung von WEB-REQ-05 durch DSP-REQ-01..04 entfernt.
 
 > **Einschränkung (bewusst akzeptiert):** Der Zephyr-HTTP-Server arbeitet einthreadig; der SSE-Handler blockiert während des Streamens auf der Bedingungsvariablen und belegt diesen Thread dauerhaft. Dadurch ist effektiv nur **ein** `/events`-Client gleichzeitig bedienbar — ein zweiter Browser erhält erst nach Abbau der ersten SSE-Verbindung eine Antwort. Dies weicht vom 3-Client-Ziel aus WEB-REQ-08 ab und wurde so entschieden.
 
@@ -146,7 +146,7 @@ Die Werte werden als JSON-Objekt übertragen, das für die beiden Gruppen `burne
 - `GET /events` liefert die Antwort mit `Content-Type: text/event-stream`
 - Beim Verbindungsaufbau wird der aktuelle Messwert-Stand einmalig gesendet
 - Ein neuer `data:`-Event wird nur bei tatsächlicher Wertänderung gesendet (kein festes Sende-Intervall ohne Änderung)
-- Das JSON enthält für `burner[4]` und `core[4]` je Wert (`value`) und Gültigkeit (`valid`)
+- Das JSON enthält für `burner[4]`, `core[4]` und `gas` je Wert (`value`) und Gültigkeit (`valid`)
 - Der Zugriff auf `g_TempData` erfolgt zwischen `k_mutex_lock` und `k_mutex_unlock`
 - Kein Aufruf von `malloc`, `calloc`, `realloc` oder `free`
 - Bei längerer Inaktivität (keine Wertänderung) wird ein SSE-Kommentar (`: ka`) als Keepalive gesendet; eine abgebrochene Verbindung wird beim nächsten Sendeversuch erkannt und der Stream-Zustand zurückgesetzt
@@ -259,7 +259,7 @@ Keine.
 - [x] Gleichzeitige HTTP-Verbindungen auf maximal 3 begrenzt (siehe WEB-REQ-08)
 - [x] Änderungssignal des Temperaturdaten-Moduls umgesetzt (TMP-REQ-03: `g_TempGen`, `g_TempCondvar`, `Temp_Set`, `Temp_NotifyChanged`)
 - [x] **SSE bedient nur einen Client gleichzeitig** — bewusst akzeptiert. Der einthreadige Zephyr-HTTP-Server ruft dynamische Handler synchron in einer `do-while(!final_chunk)`-Schleife auf; ein blockierender SSE-Handler belegt den einzigen Server-Thread. Echte Mehrfach-Live-Updates erforderten einen Worker-/Poll-basierten Ansatz oder mehrere Server-Threads.
-- [x] JSON-Format festgelegt: `{"burner":[{"v":<int>,"ok":<0|1>}…],"core":[…]}` (kompakt, je 4 Einträge — `target` entfernt mit WEB-REQ-05/09)
+- [x] JSON-Format festgelegt: `{"burner":[{"v":<int>,"ok":<0|1>}…],"core":[…],"gas":{…}}` (`burner`/`core` je 4 Einträge, `gas` Einzeleintrag; `target` entfernt mit WEB-REQ-05/09)
 - [ ] Echtdaten erst mit der Bluetooth-Implementierung; bis dahin Test über Shell-Befehl `temp set <burner|core> …` / `temp clear <burner|core> …`
 
 ### WEB-REQ-09
@@ -287,3 +287,4 @@ Keine.
 | 1.8     | 2026-05-29 |       | WEB-REQ-09 ergänzt: farbliche Hervorhebung der Kerntemperatur-Zellen in Abhängigkeit von der Zieltemperatur |
 | 1.9     | 2026-05-29 |       | WEB-REQ-09 umgesetzt: `col()`-Funktion im JavaScript-Client (`k_HtmlScript`) |
 | 1.10    | 2026-05-29 |       | WEB-REQ-05 und WEB-REQ-09 abgelöst durch DSP-REQ-01..04; SSE-Feld `target` entfernt; WEB-REQ-07 auf `b1`–`b4` / `c1`–`c4` und Implementierungsverweis auf `Html_AppendDisplay()` aktualisiert |
+| 1.11    | 2026-05-29 |       | SSE-Feld `gas` (Einzeleintrag) ergänzt für DSP-REQ-06 |

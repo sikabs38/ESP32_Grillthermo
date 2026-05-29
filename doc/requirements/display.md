@@ -2,7 +2,7 @@
 
 ## 1. Übersicht
 
-Die Webanzeige stellt vier Temperaturblöcke dar — einen pro Grillzone. Jeder Block besteht aus zwei nebeneinander angeordneten Anzeigefeldern: Garraumtemperatur und Kerntemperatur des Grillguts. Beide Felder sind identisch aufgebaut und folgen demselben visuellen Schema.
+Die Webanzeige stellt vier Temperaturblöcke dar — einen pro Grillzone. Jeder Block besteht aus zwei nebeneinander angeordneten Anzeigefeldern: Garraumtemperatur und Kerntemperatur des Grillguts. Beide Felder sind identisch aufgebaut und folgen demselben visuellen Schema. Unterhalb der vier Blöcke wird der Gasflaschen-Füllstand zentriert dargestellt (DSP-REQ-06).
 
 Grundlage: `doc/G32_Anzeige_Beschreibung.docx`, Version 1.0 vom 29. Mai 2026.
 
@@ -16,9 +16,11 @@ Grundlage: `doc/G32_Anzeige_Beschreibung.docx`, Version 1.0 vom 29. Mai 2026.
 
 Die Anzeige soll vier Temperaturblöcke darstellen, einen pro Grillzone (Index 0..3, entsprechend `burner[0..3]` und `core[0..3]` aus TMP-REQ-01). Jeder Block enthält links eine Garraumtemperatur-Anzeige (DSP-REQ-02) und rechts eine Kerntemperatur-Anzeige (DSP-REQ-03).
 
+Die vier Blöcke werden in einem zweispaltigen Raster (2 × 2) angeordnet, da die typischen Anzeigegeräte (Tablet, Notebook, Desktop) im Querformat (Landscape) betrieben werden. Auf sehr schmalen Bildschirmen (Portrait, Breite < 600 px) fällt die Anordnung auf einspaltig zurück, damit die Inhalte lesbar bleiben.
+
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch | Umgesetzt | `app/src/webserver.c:Webserver_BuildHtml()` Schleife über `TEMP_ZONE_COUNT`; Block-Fragmente `k_BlockOpen`/`k_BlockMid`/`k_BlockClose` |
+| Hoch | Umgesetzt | `app/src/webserver.c:Webserver_BuildHtml()` Schleife über `TEMP_ZONE_COUNT`; Block-Fragmente `k_BlockOpen`/`k_BlockMid`/`k_BlockClose`; Grid-Container `k_GridOpen`/`k_GridClose` mit CSS-Klasse `.gr` (zwei Spalten, Media-Query für Portrait) |
 
 #### Abhängigkeiten
 
@@ -29,6 +31,8 @@ Die Anzeige soll vier Temperaturblöcke darstellen, einen pro Grillzone (Index 0
 - Die Anzeige enthält genau vier Temperaturblöcke
 - Jeder Block zeigt Garraum- und Kerntemperatur derselben Grillzone
 - Die Blöcke sind eindeutig den Grillzonen 1..4 zugeordnet
+- Im Landscape-Modus (Fensterbreite ≥ 600 px) sind die Blöcke in zwei Spalten (2 × 2) angeordnet
+- Bei Fensterbreite < 600 px wechselt die Anordnung auf eine Spalte (vier Blöcke untereinander)
 
 ---
 
@@ -202,9 +206,59 @@ Bei Kerntemperaturwerten außerhalb des Profilbereichs verhält sich die Anzeige
 
 ---
 
+### DSP-REQ-06 — Gasflaschen-Füllstand
+
+#### Beschreibung
+
+Unterhalb der vier Temperaturblöcke (DSP-REQ-01) soll der Füllstand der Gasflasche zentriert dargestellt werden. Die Anzeige enthält:
+
+- Numerischer Wert: große digitale Zahl in Prozent
+- Farbbalken: horizontale Skala über 0–100 %, in drei Zonen unterteilt
+- Indikator: bewegliche senkrechte Markierung auf dem Balken, zeigt die aktuelle Position
+
+**Wertebereich:**
+
+| Eigenschaft  | Wert                |
+|--------------|---------------------|
+| Minimum      | 0 %                 |
+| Maximum      | 100 %               |
+| Einheit      | Prozent (%)         |
+| Darstellung  | Ganzzahl (gerundet) |
+
+**Farbzonen:**
+
+| Zone            | Von (%) | Bis (%) | Verwendung                  |
+|-----------------|---------|---------|-----------------------------|
+| Kritisch (Rot)  | 0       | 5       | Sofort tauschen             |
+| Niedrig (Gelb)  | 5       | 10      | Ersatzflasche bereithalten  |
+| OK (Grün)       | 10      | 100     | Ausreichend                 |
+
+Bei `valid = false` wird `--` angezeigt (z. B. wenn noch kein Sensorwert vorliegt).
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Hoch | Umgesetzt | `app/src/temp_data.h`: `Temp_Data_t.gas`, `Temp_SetGas()`; `app/src/webserver.c`: `k_GasOpen`/`k_GasClose`, `Html_AppendGas()`, JS-Konstante `GS`, SSE-Feld `gas`; `app/src/shell.c`: `gas set`/`gas clear` (Testbefehle) |
+
+#### Abhängigkeiten
+
+- DSP-REQ-01 (Temperaturblöcke — die Gas-Anzeige folgt unterhalb)
+- TMP-REQ-01 (Datenstruktur — Gas-Eintrag als zusätzliches Feld)
+
+#### Abnahmekriterien
+
+- Die Anzeige erscheint unterhalb der vier Temperaturblöcke und ist horizontal zentriert
+- Der Wert wird als gerundete Ganzzahl in Prozent dargestellt (`<wert> %`)
+- Werte 0–5 % liegen im roten, 5–10 % im gelben, 10–100 % im grünen Bereich des Balkens
+- Indikatorposition entspricht dem aktuellen Wert auf der 0..100-%-Skala
+- Bei `valid = false` wird `--` angezeigt, Indikator steht am linken Anschlag
+
+---
+
 ## 3. Änderungshistorie
 
 | Version | Datum      | Autor | Änderung |
 |---------|------------|-------|----------|
 | 1.0     | 2026-05-29 |       | Erstellt: DSP-REQ-01..05 aus `doc/G32_Anzeige_Beschreibung.docx` v1.0 (ohne Simulationsmodus) |
 | 1.1     | 2026-05-29 |       | DSP-REQ-01..05 im Webserver umgesetzt (`app/src/webserver.c`: vier Zonenblöcke, Profilauswahl, Farbbalken mit Indikator) |
+| 1.2     | 2026-05-29 |       | DSP-REQ-01 auf zweispaltiges 2 × 2-Layout für Landscape-Geräte erweitert; Fallback auf einspaltig bei Fensterbreite < 600 px |
+| 1.3     | 2026-05-29 |       | DSP-REQ-06 ergänzt und umgesetzt: Gasflaschen-Füllstand (digital + Farbbalken 0–100 %, Rot/Gelb/Grün); SSE-Feld `gas`, Shell-Befehle `gas set`/`gas clear` |

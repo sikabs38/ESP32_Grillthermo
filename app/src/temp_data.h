@@ -17,10 +17,13 @@ typedef struct {
     bool    valid; /* false: Wert nicht verfuegbar */
 } Temp_Entry_t;
 
-/* TMP-REQ-01: Gesamtstruktur aller Messwerte */
+/* TMP-REQ-01: Gesamtstruktur aller Messwerte. Trotz des Namens "Temp" enthaelt
+ * die Struct auch nicht-temperaturartige Sensordaten (z.B. Gasfuellstand), die
+ * unter demselben Mutex/Condvar bereitgestellt werden. */
 typedef struct {
-    Temp_Entry_t burner[TEMP_ZONE_COUNT]; /* Brennertemperaturen */
-    Temp_Entry_t core[TEMP_ZONE_COUNT];   /* Kerntemperaturen (Fleischthermometer) */
+    Temp_Entry_t burner[TEMP_ZONE_COUNT]; /* Brennertemperaturen (°C) */
+    Temp_Entry_t core[TEMP_ZONE_COUNT];   /* Kerntemperaturen (°C, Fleischthermometer) */
+    Temp_Entry_t gas;                     /* DSP-REQ-06: Gasflaschen-Fuellstand (%) */
 } Temp_Data_t;
 
 /* TMP-REQ-02: Global verfuegbare Datenstruktur und Mutex */
@@ -47,5 +50,11 @@ int Temp_Set(uint8_t group, uint8_t zone, int16_t value, bool valid);
  * dass ein Erzeuger g_TempData direkt unter Mutex aktualisiert und danach genau
  * einmal eine Sammel-Benachrichtigung ausloesen moechte. */
 void Temp_NotifyChanged(void);
+
+/* DSP-REQ-06: Gasflaschen-Fuellstand setzen (Wert in Prozent 0..100, atomar unter
+ * g_TempMutex; erhoeht g_TempGen und weckt Warter).
+ * percent: 0..100 (bei valid = true erforderlich), ignoriert bei valid = false.
+ * Rueckgabe: 0 bei Erfolg, -EINVAL bei (valid && percent ausserhalb 0..100). */
+int Temp_SetGas(int16_t percent, bool valid);
 
 #endif /* APP_TEMP_DATA_H */

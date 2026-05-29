@@ -1,4 +1,4 @@
-/* WEB-REQ-01..09, TMP-REQ-02, TMP-REQ-03, DSP-REQ-01..05 */
+/* WEB-REQ-01..09, TMP-REQ-02, TMP-REQ-03, DSP-REQ-01..06 */
 #include "webserver.h"
 #include "temp_data.h"
 
@@ -49,7 +49,11 @@ static const char k_HtmlCss[] =
     ".ch{padding:6px 14px;border:1px solid #888;border-radius:14px;"
     "background:#fff;color:#222;cursor:pointer;font:inherit;}"
     ".ch.a{background:#0a7;border-color:#0a7;color:#fff;}"
-    ".bl{border:1px solid #ccc;border-radius:6px;padding:10px;margin:10px 0;"
+    /* DSP-REQ-01: zweispaltiges Raster (2 x 2) fuer Landscape-Geraete; */
+    /* Fallback auf eine Spalte unterhalb 600 px Breite. */
+    ".gr{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}"
+    "@media(max-width:600px){.gr{grid-template-columns:1fr;}}"
+    ".bl{border:1px solid #ccc;border-radius:6px;padding:10px;"
     "background:#fff;}"
     ".zh{font-weight:bold;margin-bottom:8px;text-align:center;color:#555;}"
     ".ds{display:flex;gap:14px;}"
@@ -64,6 +68,9 @@ static const char k_HtmlCss[] =
     ".lg{font-size:11px;color:#666;margin-top:6px;}"
     ".dot{display:inline-block;width:8px;height:8px;border-radius:50%;"
     "margin:0 3px 0 8px;vertical-align:middle;}"
+    /* DSP-REQ-06: Gasflaschen-Anzeige zentriert unterhalb der Bloecke */
+    ".gs{margin:14px auto 0;max-width:480px;border:1px solid #ccc;"
+    "border-radius:6px;padding:10px;background:#fff;text-align:center;}"
     "</style></head><body>"
     "<div class=\"hdr\"><h1>";
 
@@ -78,7 +85,9 @@ static const char k_HtmlProfiles[] =
     "<button class=\"ch\" data-p=\"fisch\">Fisch</button>"
     "</div>";
 
-/* DSP-REQ-01: Block-Fragmente (ein Block je Grillzone) */
+/* DSP-REQ-01: Grid-Container und Block-Fragmente (ein Block je Grillzone) */
+static const char k_GridOpen[]   = "<div class=\"gr\">";
+static const char k_GridClose[]  = "</div>";
 static const char k_BlockOpen[]  = "<div class=\"bl\"><div class=\"zh\">Zone ";
 static const char k_BlockMid[]   = "</div><div class=\"ds\">";
 static const char k_BlockClose[] = "</div></div>";
@@ -98,6 +107,14 @@ static const char k_LblGarraum[] = "Garraum";
 static const char k_LblKern[]    = "Kern";
 static const char k_NotAvail[]   = "--";
 static const char k_DegUnit[]    = "&nbsp;&deg;C";
+
+/* DSP-REQ-06: Gasflaschen-Anzeige (Numerik + Farbbalken, 0..100 %) */
+static const char k_GasOpen[]  =
+    "<div class=\"gs\" id=\"g\"><div class=\"zh\">Gasflasche</div>"
+    "<div class=\"vl\">";
+static const char k_GasClose[] =
+    "</div><div class=\"br\"><div class=\"in\"></div></div></div>";
+static const char k_PctUnit[]  = "&nbsp;%";
 
 /* DSP-REQ-02..05 + WEB-REQ-07: clientseitige Logik
  *   GR  = Garraum-Konfiguration (Bereich 0..450 °C, Farbbaender, Zonennamen)
@@ -128,6 +145,10 @@ static const char k_HtmlScript[] =
     "fisch:{mn:45,mx:72,s:[{f:45,t:52,c:'#3080ff',n:'Glasig'},"
     "{f:52,t:62,c:'#30b040',n:'Durch'},"
     "{f:62,t:72,c:'#e03030',n:'Zu durch'}]}};"
+    /* DSP-REQ-06: Gasflasche — 0..100 %, drei Farbzonen (Rot/Gelb/Gruen) */
+    "var GS={mn:0,mx:100,u:'&nbsp;%',"
+    "bd:[{f:0,t:5,c:'#e03030'},{f:5,t:10,c:'#ffd040'},"
+    "{f:10,t:100,c:'#30b040'}]};"
     "var cp='rind';"
     "var LD={b:[null,null,null,null],c:[null,null,null,null]};"
     "function grad(mn,mx,a){var p=[],i,b,p1,p2;"
@@ -138,16 +159,18 @@ static const char k_HtmlScript[] =
     "return 'linear-gradient(to right,'+p.join(',')+')';}"
     "function nm(v,a){var i;for(i=0;i<a.length;i++){"
     "if(v>=a[i].f&&v<=a[i].t)return a[i].n;}return '';}"
+    /* up(): generisch fuer Temp- und Gas-Anzeigen; .zn und arr (p.s/p.zn) optional */
     "function up(id,e,p){var c=document.getElementById(id);if(!c)return;"
     "var vl=c.querySelector('.vl'),ind=c.querySelector('.in'),"
     "zo=c.querySelector('.zn');"
-    "if(!e||!e.ok){vl.innerHTML='--';ind.style.left='0%';zo.textContent='';return;}"
-    "vl.innerHTML=e.v+'&nbsp;&deg;C';"
+    "if(!e||!e.ok){vl.innerHTML='--';ind.style.left='0%';"
+    "if(zo)zo.textContent='';return;}"
+    "vl.innerHTML=e.v+(p.u||'&nbsp;&deg;C');"
     "var arr=p.s||p.zn,pos,sn='';"
     "if(e.v<p.mn){pos=0;}"
-    "else if(e.v>p.mx){pos=100;sn=arr[arr.length-1].n;}"
-    "else{pos=(e.v-p.mn)/(p.mx-p.mn)*100;sn=nm(e.v,arr);}"
-    "ind.style.left=pos+'%';zo.textContent=sn;}"
+    "else if(e.v>p.mx){pos=100;if(arr)sn=arr[arr.length-1].n;}"
+    "else{pos=(e.v-p.mn)/(p.mx-p.mn)*100;if(arr)sn=nm(e.v,arr);}"
+    "ind.style.left=pos+'%';if(zo)zo.textContent=sn;}"
     "function setPr(n){cp=n;var p=PR[n],i,j,bar,lg,h;"
     "var ch=document.querySelectorAll('.ch');"
     "for(i=0;i<ch.length;i++)ch[i].classList.toggle('a',ch[i].dataset.p===n);"
@@ -161,6 +184,7 @@ static const char k_HtmlScript[] =
     "if(LD.c[i-1])up('c'+i,LD.c[i-1],p);}}"
     "for(var i=1;i<=4;i++)"
     "document.querySelector('#b'+i+' .br').style.background=grad(GR.mn,GR.mx,GR.bd);"
+    "document.querySelector('#g .br').style.background=grad(GS.mn,GS.mx,GS.bd);"
     "setPr('rind');"
     "var ch=document.querySelectorAll('.ch');"
     "for(var k=0;k<ch.length;k++)ch[k].onclick=function(){setPr(this.dataset.p);};"
@@ -168,13 +192,16 @@ static const char k_HtmlScript[] =
     "es.onmessage=function(e){var d=JSON.parse(e.data),i;"
     "for(i=0;i<4;i++){LD.b[i]=d.burner[i];LD.c[i]=d.core[i];"
     "up('b'+(i+1),d.burner[i],GR);"
-    "up('c'+(i+1),d.core[i],PR[cp]);}};"
+    "up('c'+(i+1),d.core[i],PR[cp]);}"
+    "if(d.gas)up('g',d.gas,GS);};"
     "</script></body></html>";
 
-/* WEB-REQ-06: SSE-Rahmen und JSON-Fragmente (kompaktes Format) */
+/* WEB-REQ-06: SSE-Rahmen und JSON-Fragmente (kompaktes Format).
+ * DSP-REQ-06: das gas-Feld ist ein Objekt (kein Array). */
 static const char k_SseDataPre[]  = "data: {\"burner\":[";
 static const char k_SseCore[]     = "],\"core\":[";
-static const char k_SseDataPost[] = "]}\n\n";
+static const char k_SseGas[]      = "],\"gas\":";
+static const char k_SseDataPost[] = "}\n\n";
 static const char k_SseKeepAlive[] = ": ka\n\n";
 static const char k_JsonEntryPre[] = "{\"v\":";
 static const char k_JsonEntryOk1[] = ",\"ok\":1}";
@@ -265,8 +292,23 @@ static void Html_AppendDisplay(BufCtx_t *ctx, char group, char zoneCh,
     Buf_Append(ctx, k_DispClose, sizeof(k_DispClose) - 1U);
 }
 
+/* DSP-REQ-06: Gasflaschen-Anzeige (id "g") — Wert in %, Farbbalken mit Indikator. */
+static void Html_AppendGas(BufCtx_t *ctx, const Temp_Entry_t *entry)
+{
+    Buf_Append(ctx, k_GasOpen, sizeof(k_GasOpen) - 1U);
+
+    if (entry->valid) {
+        Buf_AppendInt16(ctx, entry->value);
+        Buf_Append(ctx, k_PctUnit, sizeof(k_PctUnit) - 1U);
+    } else {
+        Buf_Append(ctx, k_NotAvail, sizeof(k_NotAvail) - 1U);
+    }
+
+    Buf_Append(ctx, k_GasClose, sizeof(k_GasClose) - 1U);
+}
+
 /* ------------------------------------------------------------------ */
-/* Vollstaendige Seite aufbauen          WEB-REQ-02ff, DSP-REQ-01..05  */
+/* Vollstaendige Seite aufbauen        WEB-REQ-02ff, DSP-REQ-01..06    */
 /* ------------------------------------------------------------------ */
 
 static int Webserver_BuildHtml(const char *hostname, const Temp_Data_t *data)
@@ -285,6 +327,9 @@ static int Webserver_BuildHtml(const char *hostname, const Temp_Data_t *data)
 
     /* DSP-REQ-04: Profil-Auswahl */
     Buf_Append(&ctx, k_HtmlProfiles, sizeof(k_HtmlProfiles) - 1U);
+
+    /* DSP-REQ-01: zweispaltiges Raster (2 x 2) fuer die vier Zonenbloecke */
+    Buf_Append(&ctx, k_GridOpen, sizeof(k_GridOpen) - 1U);
 
     /* DSP-REQ-01: vier Zonenbloecke, je mit Garraum- und Kernanzeige */
     for (i = 0U; i < (uint8_t)TEMP_ZONE_COUNT; i++) {
@@ -306,7 +351,12 @@ static int Webserver_BuildHtml(const char *hostname, const Temp_Data_t *data)
         Buf_Append(&ctx, k_BlockClose, sizeof(k_BlockClose) - 1U);
     }
 
-    /* WEB-REQ-07 + DSP-REQ-04/05: clientseitige Logik */
+    Buf_Append(&ctx, k_GridClose, sizeof(k_GridClose) - 1U);
+
+    /* DSP-REQ-06: Gasflaschen-Anzeige zentriert unterhalb des Rasters */
+    Html_AppendGas(&ctx, &data->gas);
+
+    /* WEB-REQ-07 + DSP-REQ-04/05/06: clientseitige Logik */
     Buf_Append(&ctx, k_HtmlScript, sizeof(k_HtmlScript) - 1U);
 
     if (ctx.overflow) {
@@ -320,6 +370,18 @@ static int Webserver_BuildHtml(const char *hostname, const Temp_Data_t *data)
 /* SSE-Datenframe (JSON)                                  WEB-REQ-06   */
 /* ------------------------------------------------------------------ */
 
+/* Einzelner Eintrag als {"v":<wert>,"ok":<0|1>}-Objekt */
+static void Sse_AppendEntry(BufCtx_t *ctx, const Temp_Entry_t *entry)
+{
+    Buf_Append(ctx, k_JsonEntryPre, sizeof(k_JsonEntryPre) - 1U);
+    Buf_AppendInt16(ctx, entry->value);
+    if (entry->valid) {
+        Buf_Append(ctx, k_JsonEntryOk1, sizeof(k_JsonEntryOk1) - 1U);
+    } else {
+        Buf_Append(ctx, k_JsonEntryOk0, sizeof(k_JsonEntryOk0) - 1U);
+    }
+}
+
 /* Eine Gruppe als JSON-Array von {"v":<wert>,"ok":<0|1>}-Objekten */
 static void Sse_AppendGroup(BufCtx_t *ctx, const Temp_Entry_t *arr)
 {
@@ -329,13 +391,7 @@ static void Sse_AppendGroup(BufCtx_t *ctx, const Temp_Entry_t *arr)
         if (i > 0U) {
             Buf_Append(ctx, ",", 1U);
         }
-        Buf_Append(ctx, k_JsonEntryPre, sizeof(k_JsonEntryPre) - 1U);
-        Buf_AppendInt16(ctx, arr[i].value);
-        if (arr[i].valid) {
-            Buf_Append(ctx, k_JsonEntryOk1, sizeof(k_JsonEntryOk1) - 1U);
-        } else {
-            Buf_Append(ctx, k_JsonEntryOk0, sizeof(k_JsonEntryOk0) - 1U);
-        }
+        Sse_AppendEntry(ctx, &arr[i]);
     }
 }
 
@@ -349,6 +405,8 @@ static int Webserver_BuildSseData(const Temp_Data_t *data)
     Sse_AppendGroup(&ctx, data->burner);
     Buf_Append(&ctx, k_SseCore, sizeof(k_SseCore) - 1U);
     Sse_AppendGroup(&ctx, data->core);
+    Buf_Append(&ctx, k_SseGas, sizeof(k_SseGas) - 1U);
+    Sse_AppendEntry(&ctx, &data->gas);
     Buf_Append(&ctx, k_SseDataPost, sizeof(k_SseDataPost) - 1U);
 
     if (ctx.overflow) {

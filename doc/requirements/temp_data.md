@@ -12,10 +12,11 @@ Das Temperaturdaten-Modul stellt eine zentrale, thread-sichere Datenstruktur ber
 
 #### Beschreibung
 
-Die Temperaturdaten sollen in einer Struct `Temp_Data_t` gespeichert werden. Jeder Einzelwert besteht aus dem Temperaturwert (`int16_t`, Einheit °C) und einem Gültigkeitsflag (`bool valid`). Ein Wert von 0 °C ist ein gültiger Messwert und kein Sonderwert. Nicht gesetzte oder nicht verfügbare Messwerte werden durch `valid = false` gekennzeichnet und im Webserver als `--` angezeigt. Die Struct enthält:
+Die Temperaturdaten sollen in einer Struct `Temp_Data_t` gespeichert werden. Jeder Einzelwert besteht aus einem Zahlenwert (`int16_t`) und einem Gültigkeitsflag (`bool valid`). Bei Temperaturen ist die Einheit °C, bei Füllständen %. Ein Wert von 0 ist ein gültiger Messwert und kein Sonderwert. Nicht gesetzte oder nicht verfügbare Messwerte werden durch `valid = false` gekennzeichnet und im Webserver als `--` angezeigt. Die Struct enthält:
 
-- 4 Brennertemperaturen (`burner[4]`): Initialisierungswert 20 °C, `valid = true`
-- 4 Kerntemperaturen (`core[4]`): Initialisierungswert 0 °C, `valid = false`
+- 4 Brennertemperaturen (`burner[4]`, °C): Initialisierungswert 20, `valid = true`
+- 4 Kerntemperaturen (`core[4]`, °C): Initialisierungswert 0, `valid = false`
+- 1 Gasflaschen-Füllstand (`gas`, %, DSP-REQ-06): Initialisierungswert 0, `valid = false`
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
@@ -28,10 +29,10 @@ Keine.
 #### Abnahmekriterien
 
 - `Temp_Entry_t` enthält genau die Felder `value` (int16_t) und `valid` (bool)
-- `Temp_Data_t` enthält `burner[4]` und `core[4]` vom Typ `Temp_Entry_t`
+- `Temp_Data_t` enthält `burner[4]`, `core[4]` und `gas` vom Typ `Temp_Entry_t`
 - Nach dem Start zeigen alle vier Brenner 20 °C an (`valid = true`)
-- Nach dem Start zeigen alle Kerntemperaturen `--` an (`valid = false`)
-- Ein gesetzter Wert von 0 °C wird als `0 °C` angezeigt, nicht als `--`
+- Nach dem Start zeigen alle Kerntemperaturen sowie der Gasfüllstand `--` an (`valid = false`)
+- Ein gesetzter Wert von 0 wird als `0 °C` bzw. `0 %` angezeigt, nicht als `--`
 
 ---
 
@@ -117,3 +118,4 @@ Keine.
 | 1.0     | 2026-05-28 |       | Erstellt: TMP-REQ-01 (Struct), TMP-REQ-02 (Mutex) |
 | 1.1     | 2026-05-29 |       | TMP-REQ-03 ergänzt und umgesetzt: Änderungssignal (`g_TempGen`, `g_TempCondvar`, `Temp_Set`, `Temp_NotifyChanged`) |
 | 1.2     | 2026-05-29 |       | `target[4]` und `TEMP_GROUP_TARGET` entfernt — die Zieltemperatur wird durch die Grillgut-Profile aus DSP-REQ-04 abgelöst |
+| 1.3     | 2026-05-29 |       | Feld `gas` (Gasflaschen-Füllstand, %) und `Temp_SetGas()` ergänzt für DSP-REQ-06 |

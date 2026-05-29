@@ -865,9 +865,75 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_temp,
     SHELL_SUBCMD_SET_END
 );
 
+/* ------------------------------------------------------------------ */
+/* gas — Testbefehl fuer den Gasflaschen-Fuellstand        DSP-REQ-06 */
+/* ------------------------------------------------------------------ */
+
+static int Shell_CmdGasSet(const struct shell *sh, size_t argc, char **argv)
+{
+    long  value;
+    char *endPtr = NULL;
+    int   rc;
+
+    ARG_UNUSED(argc);
+
+    if (!Shell_CheckAuth(sh)) {
+        return -EACCES;
+    }
+
+    value = strtol(argv[1], &endPtr, 10);
+
+    if ((endPtr == argv[1]) || (*endPtr != '\0') ||
+        (value < 0L) || (value > 100L)) {
+        shell_error(sh, "Ungueltiger Wert (0-100).");
+        return -EINVAL;
+    }
+
+    rc = Temp_SetGas((int16_t)value, true);
+
+    if (rc < 0) {
+        shell_error(sh, "Fehler beim Setzen: %d", rc);
+        return rc;
+    }
+
+    shell_print(sh, "Gasflasche: %ld%%", value);
+
+    return 0;
+}
+
+static int Shell_CmdGasClear(const struct shell *sh, size_t argc, char **argv)
+{
+    int rc;
+
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+
+    if (!Shell_CheckAuth(sh)) {
+        return -EACCES;
+    }
+
+    rc = Temp_SetGas((int16_t)0, false);
+
+    if (rc < 0) {
+        shell_error(sh, "Fehler beim Loeschen: %d", rc);
+        return rc;
+    }
+
+    shell_print(sh, "Gasflasche: --");
+
+    return 0;
+}
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_gas,
+    SHELL_CMD_ARG(set,   NULL, "Fuellstand setzen: <0-100>", Shell_CmdGasSet,   2, 0),
+    SHELL_CMD(    clear, NULL, "Fuellstand auf -- setzen",  Shell_CmdGasClear),
+    SHELL_SUBCMD_SET_END
+);
+
 SHELL_CMD_REGISTER(logout,     NULL,        "Abmelden",                         Shell_CmdLogout);
 SHELL_CMD_REGISTER(wifi,       &sub_wifi,   "WiFi-Konfiguration",               NULL);
 SHELL_CMD_REGISTER(mqtt,       &sub_mqtt,   "MQTT-Konfiguration",               NULL);
 SHELL_CMD_REGISTER(config,     &sub_config, "Systemkonfiguration",              NULL);
 SHELL_CMD_REGISTER(temp,       &sub_temp,   "Temperaturwerte setzen (Test)",    NULL);
+SHELL_CMD_REGISTER(gas,        &sub_gas,    "Gasflaschen-Fuellstand setzen (Test)", NULL);
 SHELL_CMD_REGISTER(bootloader, NULL,        "In Download-Modus wechseln",       Shell_CmdBootloader);

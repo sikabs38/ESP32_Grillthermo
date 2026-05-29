@@ -28,4 +28,26 @@ typedef struct {
 extern struct k_mutex g_TempMutex;
 extern Temp_Data_t    g_TempData;
 
+/* TMP-REQ-03: Generationszaehler und Condvar zur Aenderungsbenachrichtigung.
+ * g_TempGen wird bei jeder Wertaenderung (unter g_TempMutex) erhoeht; Warter
+ * auf g_TempCondvar (z.B. der SSE-Handler) werden geweckt. */
+extern struct k_condvar g_TempCondvar;
+extern uint32_t         g_TempGen;
+
+/* TMP-REQ-03: Gruppenindex fuer Temp_Set() */
+#define TEMP_GROUP_BURNER (0U)
+#define TEMP_GROUP_CORE   (1U)
+#define TEMP_GROUP_TARGET (2U)
+
+/* TMP-REQ-03: Einzelnen Messwert setzen, Generationszaehler erhoehen und Warter
+ * wecken — alles atomar unter g_TempMutex.
+ * group: TEMP_GROUP_*, zone: 0..TEMP_ZONE_COUNT-1.
+ * Rueckgabe: 0 bei Erfolg, -EINVAL bei ungueltigem group/zone. */
+int Temp_Set(uint8_t group, uint8_t zone, int16_t value, bool valid);
+
+/* TMP-REQ-03: Aenderung signalisieren, ohne einen Wert zu setzen — fuer den Fall,
+ * dass ein Erzeuger g_TempData direkt unter Mutex aktualisiert und danach genau
+ * einmal eine Sammel-Benachrichtigung ausloesen moechte. */
+void Temp_NotifyChanged(void);
+
 #endif /* APP_TEMP_DATA_H */

@@ -1,6 +1,7 @@
 /* SHL-REQ-01, SHL-REQ-06, SHL-REQ-07, SHL-REQ-08: Shell, Login, Bootmeldung, Bootloader */
 #include "config.h"
 #include "wifi.h"
+#include "temp_data.h"
 
 #include <zephyr/kernel.h>
 #include <zephyr/init.h>
@@ -719,6 +720,124 @@ static int Shell_CmdWifiStatus(const struct shell *sh, size_t argc, char **argv)
     return 0;
 }
 
+/* ------------------------------------------------------------------ */
+/* temp — Testbefehl zum manuellen Setzen von Messwerten   TMP-REQ-03 */
+/* ------------------------------------------------------------------ */
+
+/* Gruppenname in TEMP_GROUP_* uebersetzen */
+static int Shell_TempParseGroup(const char *name, uint8_t *group)
+{
+    if (strcmp(name, "burner") == 0) {
+        *group = (uint8_t)TEMP_GROUP_BURNER;
+    } else if (strcmp(name, "core") == 0) {
+        *group = (uint8_t)TEMP_GROUP_CORE;
+    } else if (strcmp(name, "target") == 0) {
+        *group = (uint8_t)TEMP_GROUP_TARGET;
+    } else {
+        return -EINVAL;
+    }
+
+    return 0;
+}
+
+/* Zone (1..TEMP_ZONE_COUNT) parsen und auf 0-basierten Index pruefen */
+static int Shell_TempParseZone(const char *arg, uint8_t *zoneIdx)
+{
+    char         *endPtr = NULL;
+    unsigned long zone;
+
+    zone = strtoul(arg, &endPtr, 10);
+
+    if ((endPtr == arg) || (*endPtr != '\0') ||
+        (zone < 1UL) || (zone > (unsigned long)TEMP_ZONE_COUNT)) {
+        return -EINVAL;
+    }
+
+    *zoneIdx = (uint8_t)(zone - 1UL);
+
+    return 0;
+}
+
+/* TMP-REQ-03: Einzelwert setzen (valid=true), loest SSE-Push aus (WEB-REQ-06) */
+static int Shell_CmdTempSet(const struct shell *sh, size_t argc, char **argv)
+{
+    uint8_t group;
+    uint8_t zoneIdx;
+    long    value;
+    char   *endPtr = NULL;
+    int     rc;
+
+    ARG_UNUSED(argc);
+
+    if (!Shell_CheckAuth(sh)) {
+        return -EACCES;
+    }
+
+    if (Shell_TempParseGroup(argv[1], &group) != 0) {
+        shell_error(sh, "Ungueltige Gruppe: burner, core oder target.");
+        return -EINVAL;
+    }
+
+    if (Shell_TempParseZone(argv[2], &zoneIdx) != 0) {
+        shell_error(sh, "Ungueltige Zone (1-%u).", (unsigned int)TEMP_ZONE_COUNT);
+        return -EINVAL;
+    }
+
+    value = strtol(argv[3], &endPtr, 10);
+
+    if ((endPtr == argv[3]) || (*endPtr != '\0') ||
+        (value < -32768L) || (value > 32767L)) {
+        shell_error(sh, "Ungueltiger Wert (-32768..32767).");
+        return -EINVAL;
+    }
+
+    rc = Temp_Set(group, zoneIdx, (int16_t)value, true);
+
+    if (rc < 0) {
+        shell_error(sh, "Fehler beim Setzen: %d", rc);
+        return rc;
+    }
+
+    shell_print(sh, "Gesetzt: %s Zone %s = %ld", argv[1], argv[2], value);
+
+    return 0;
+}
+
+/* TMP-REQ-03: Wert als ungueltig markieren (Anzeige "--"), loest SSE-Push aus */
+static int Shell_CmdTempClear(const struct shell *sh, size_t argc, char **argv)
+{
+    uint8_t group;
+    uint8_t zoneIdx;
+    int     rc;
+
+    ARG_UNUSED(argc);
+
+    if (!Shell_CheckAuth(sh)) {
+        return -EACCES;
+    }
+
+    if (Shell_TempParseGroup(argv[1], &group) != 0) {
+        shell_error(sh, "Ungueltige Gruppe: burner, core oder target.");
+        return -EINVAL;
+    }
+
+    if (Shell_TempParseZone(argv[2], &zoneIdx) != 0) {
+        shell_error(sh, "Ungueltige Zone (1-%u).", (unsigned int)TEMP_ZONE_COUNT);
+        return -EINVAL;
+    }
+
+    rc = Temp_Set(group, zoneIdx, (int16_t)0, false);
+
+    if (rc < 0) {
+        shell_error(sh, "Fehler beim Loeschen: %d", rc);
+        return rc;
+    }
+
+    shell_print(sh, "Geloescht: %s Zone %s (--)", argv[1], argv[2]);
+
+    return 0;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_wifi,
     SHELL_CMD_ARG(set,      NULL, "WiFi konfigurieren: <ssid>",       Shell_CmdWifiSet,      2, 0),
     SHELL_CMD_ARG(hostname, NULL, "Hostnamen setzen: <name>",         Shell_CmdWifiHostname, 2, 0),
@@ -740,8 +859,17 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_config,
     SHELL_SUBCMD_SET_END
 );
 
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_temp,
+    SHELL_CMD_ARG(set,   NULL, "Wert setzen: <burner|core|target> <1-4> <wert>",
+                  Shell_CmdTempSet,   4, 0),
+    SHELL_CMD_ARG(clear, NULL, "Wert auf -- setzen: <burner|core|target> <1-4>",
+                  Shell_CmdTempClear, 3, 0),
+    SHELL_SUBCMD_SET_END
+);
+
 SHELL_CMD_REGISTER(logout,     NULL,        "Abmelden",                         Shell_CmdLogout);
 SHELL_CMD_REGISTER(wifi,       &sub_wifi,   "WiFi-Konfiguration",               NULL);
 SHELL_CMD_REGISTER(mqtt,       &sub_mqtt,   "MQTT-Konfiguration",               NULL);
 SHELL_CMD_REGISTER(config,     &sub_config, "Systemkonfiguration",              NULL);
+SHELL_CMD_REGISTER(temp,       &sub_temp,   "Temperaturwerte setzen (Test)",    NULL);
 SHELL_CMD_REGISTER(bootloader, NULL,        "In Download-Modus wechseln",       Shell_CmdBootloader);

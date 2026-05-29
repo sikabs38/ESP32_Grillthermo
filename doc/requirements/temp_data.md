@@ -59,6 +59,35 @@ Die Temperaturdaten-Struct soll als globale Variable `g_TempData` verfügbar sei
 
 ---
 
+### TMP-REQ-03
+
+#### Beschreibung
+
+Das Modul soll ein Änderungssignal bereitstellen, über das wartende Verbraucher (insbesondere der SSE-Handler des Webservers, WEB-REQ-06) benachrichtigt werden, sobald neue Messwerte vorliegen. Dazu wird ein Generationszähler `g_TempGen` (`uint32_t`) geführt, der bei jeder Wertänderung unter `g_TempMutex` erhöht wird, sowie eine Bedingungsvariable `g_TempCondvar`, auf die alle Warter geweckt werden (`k_condvar_broadcast`).
+
+Zum Setzen einzelner Werte stellt das Modul die Funktion `Temp_Set(group, zone, value, valid)` bereit, die Wert und Gültigkeit atomar unter Mutex setzt, `g_TempGen` erhöht und die Warter weckt. Für Erzeuger, die `g_TempData` selbst unter Mutex aktualisieren und danach genau eine Sammel-Benachrichtigung auslösen möchten, gibt es `Temp_NotifyChanged()`.
+
+Ein Verbraucher erkennt eine Änderung, indem er sich den zuletzt gesehenen Wert von `g_TempGen` merkt und nur dann sendet, wenn dieser sich vom aktuellen Stand unterscheidet (verhindert verpasste oder doppelte Benachrichtigungen).
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Mittel    | Umgesetzt | `app/src/temp_data.h`/`.c`: `g_TempGen`, `g_TempCondvar` (`K_CONDVAR_DEFINE`), `Temp_Set()`, `Temp_NotifyChanged()`; Testbefehl `temp set`/`temp clear` in `app/src/shell.c` |
+
+#### Abhängigkeiten
+
+- TMP-REQ-02 (Mutex-geschützte Datenstruktur)
+
+#### Abnahmekriterien
+
+- `g_TempGen` wird ausschließlich unter `g_TempMutex` erhöht
+- `g_TempCondvar` ist statisch mit `K_CONDVAR_DEFINE` initialisiert
+- `Temp_Set()` setzt Wert + Gültigkeit, erhöht `g_TempGen` und ruft `k_condvar_broadcast` — alles unter Mutex
+- `Temp_Set()` liefert `-EINVAL` bei ungültiger Gruppe oder Zone (≥ `TEMP_ZONE_COUNT`)
+- `Temp_NotifyChanged()` erhöht `g_TempGen` und weckt Warter, ohne einen Wert zu ändern
+- Kein Aufruf von `malloc`, `calloc`, `realloc` oder `free`
+
+---
+
 ## 3. Nicht-funktionale Anforderungen
 
 ### TMP-NFR-01
@@ -87,3 +116,4 @@ Keine.
 | Version | Datum      | Autor | Änderung |
 |---------|------------|-------|----------|
 | 1.0     | 2026-05-28 |       | Erstellt: TMP-REQ-01 (Struct), TMP-REQ-02 (Mutex) |
+| 1.1     | 2026-05-29 |       | TMP-REQ-03 ergänzt und umgesetzt: Änderungssignal (`g_TempGen`, `g_TempCondvar`, `Temp_Set`, `Temp_NotifyChanged`) |

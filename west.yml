@@ -1,9 +1,10 @@
 manifest:
-  name: grill-buddy
   self:
-    path: app
+    path: GrillBuddy
   projects:
     - name: zephyr
       url: https://github.com/zephyrproject-rtos/zephyr
-      revision: v4.4.0
+      # Gepinnt auf den verifiziert bauenden Stand (v4.4.0-rc1-178-gccfd5efa09f).
+      # Fester SHA statt Tag, damit beide Rechner exakt diesen Baum verwenden.
+      revision: ccfd5efa09f9fed814c1947edba2739544b3c901
       import: true

@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+#
+# Bootstrap des west-Workspace fuer GrillBuddy.
+#
+# Verwendung (nach dem Klonen):
+#   git clone <repo-url> GrillBuddy
+#   GrillBuddy/scripts/west-init.sh
+#
+# Das Script legt den west-Workspace im ELTERNverzeichnis des Repos an
+# (Topdir), holt das in west.yml gepinnte Zephyr + die Module und die
+# proprietaeren ESP32-WiFi/BT-Blobs.
+#
+# Anschliessend bauen mit:
+#   cd GrillBuddy
+#   west build -b esp32s3_devkitc/esp32s3/procpu -d build app
+
+set -euo pipefail
+
+# ZEPHYR_BASE darf den projektlokalen, gepinnten Zephyr nicht ueberschreiben.
+unset ZEPHYR_BASE || true
+
+# Repo-Wurzel = ein Verzeichnis ueber diesem Script.
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WORKSPACE_DIR="$(cd "$REPO_DIR/.." && pwd)"
+
+echo ">> Repo:      $REPO_DIR"
+echo ">> Workspace: $WORKSPACE_DIR"
+
+# 1) Workspace initialisieren (nur, falls noch kein .west existiert).
+#    'west init -l' setzt den Topdir auf das Elternverzeichnis des Repos.
+if [ -d "$WORKSPACE_DIR/.west" ]; then
+	echo ">> Workspace bereits initialisiert (.west vorhanden) - ueberspringe west init."
+else
+	west init -l "$REPO_DIR"
+fi
+
+# 2) Gepinntes Zephyr + Module holen.
+west update
+
+# 3) ESP32-WiFi/BT-Blobs holen (werden von 'west update' nicht mitgeladen).
+west blobs fetch hal_espressif
+
+cat <<EOF
+
+==> Workspace bereit.
+
+Firmware bauen:
+  cd "$REPO_DIR"
+  west build -b esp32s3_devkitc/esp32s3/procpu -d build app
+
+Hinweis: ZEPHYR_BASE darf NICHT global gesetzt sein, sonst baut west gegen
+das dort referenzierte Zephyr statt gegen den projektlokal gepinnten Stand.
+EOF

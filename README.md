@@ -24,9 +24,11 @@ Firmware für die Anzeige der Temperaturen eines Otto Wilde Grills G32. Das Proj
 
 ```
 GrillBuddy/
-├── west.yml                          # West-Manifest, referenziert Zephyr 4.4.0
+├── west.yml                          # West-Manifest, pinnt Zephyr auf festen Commit
 ├── .gitignore
 ├── README.md
+├── scripts/
+│   └── west-init.sh                  # Bootstrap des west-Workspace nach dem Klonen
 └── app/                              # Firmware-Quellcode
     ├── CMakeLists.txt                # CMake Build-Definition
     ├── prj.conf                      # Kconfig-Projektkonfiguration
@@ -42,7 +44,8 @@ GrillBuddy/
 
 | Datei | Beschreibung |
 |---|---|
-| `west.yml` | West-Workspace-Manifest. Definiert Zephyr als Abhängigkeit und dessen Version. |
+| `west.yml` | West-Workspace-Manifest. Pinnt Zephyr auf einen festen Commit (reproduzierbarer Build auf allen Rechnern). |
+| `scripts/west-init.sh` | Bootstrap-Script: richtet nach dem Klonen den west-Workspace ein (`west init -l`, `west update`, Blobs). |
 | `app/CMakeLists.txt` | CMake-Konfiguration für das Zephyr-Build-System. Listet alle zu kompilierenden Quelldateien. |
 | `app/prj.conf` | Kconfig-Konfiguration. Aktiviert Zephyr-Module wie Bluetooth, WiFi, MQTT und HTTP-Server. |
 | `app/boards/esp32s3_devkitc_procpu.conf` | Board-spezifische Kconfig-Optionen für das ESP32-S3 DevKitC. |
@@ -56,31 +59,50 @@ GrillBuddy/
 
 West und das Zephyr SDK müssen installiert sein. Siehe [Zephyr Getting Started Guide](https://docs.zephyrproject.org/latest/develop/getting_started/index.html).
 
-Zephyr OS liegt unter `~/zephyrproject`. Die Umgebungsvariable `ZEPHYR_BASE` muss gesetzt sein:
+**Wichtig:** `ZEPHYR_BASE` darf **nicht** gesetzt sein. Dieses Projekt bringt über `west.yml` sein eigenes, auf einen festen Commit gepinntes Zephyr mit (eigener west-Workspace). Ein global gesetztes `ZEPHYR_BASE` (z. B. aus `~/.bashrc`) würde den Build auf ein anderes Zephyr umlenken — in dem Fall den Export entfernen.
 
-```bash
-export ZEPHYR_BASE=~/zephyrproject/zephyr
-source ~/zephyrproject/zephyr/zephyr-env.sh
+### Workspace einrichten
+
+Das Repo ist das Manifest-Repo eines eigenen west-Workspace. Zephyr und die Module liegen **neben** dem Repo im Workspace-Topdir (deshalb in `.gitignore`, nicht im Repo selbst):
+
+```
+grill-buddy-ws/            <- Workspace (Topdir, kein git-Repo)
+├── GrillBuddy/            <- dieses Repo (west-Manifest, self.path)
+├── zephyr/                <- in west.yml gepinnte Zephyr-Version
+└── modules/ bootloader/ tools/
 ```
 
-### Repository initialisieren
+Einrichtung per Bootstrap-Script:
 
 ```bash
-west init -m <repo-url> grill-buddy-workspace
-cd grill-buddy-workspace
-west update
+mkdir grill-buddy-ws && cd grill-buddy-ws
+git clone <repo-url> GrillBuddy
+GrillBuddy/scripts/west-init.sh
 ```
+
+Das Script führt `west init -l`, `west update` und `west blobs fetch hal_espressif` aus. Alternativ manuell:
+
+```bash
+mkdir grill-buddy-ws && cd grill-buddy-ws
+git clone <repo-url> GrillBuddy
+west init -l GrillBuddy        # Topdir = grill-buddy-ws
+west update                    # gepinntes Zephyr + Module holen
+west blobs fetch hal_espressif # ESP32-WiFi/BT-Blobs (nicht in west update enthalten)
+```
+
+> In ein Verzeichnis namens `GrillBuddy` klonen — der Name muss zu `self.path` in `west.yml` passen.
 
 ### Firmware bauen
 
 ```bash
-west build -b esp32s3_devkitc/esp32s3/procpu app/
+cd GrillBuddy
+west build -b esp32s3_devkitc/esp32s3/procpu -d build app
 ```
 
 ### Firmware komplett neu bauen
 
 ```bash
-west build -p always -b esp32s3_devkitc/esp32s3/procpu app/
+west build -p always -b esp32s3_devkitc/esp32s3/procpu -d build app
 ```
 
 ### Firmware flashen

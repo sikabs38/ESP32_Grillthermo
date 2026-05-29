@@ -1,4 +1,4 @@
-/* WEB-REQ-01..08, TMP-REQ-02, TMP-REQ-03 */
+/* WEB-REQ-01..09, TMP-REQ-02, TMP-REQ-03 */
 #include "webserver.h"
 #include "temp_data.h"
 
@@ -60,15 +60,23 @@ static const char k_HtmlSec3[]     = "</div><h2>Zieltemperatur</h2><div class=\"
 static const char k_HtmlRowEnd[]   = "</div>";
 
 /* WEB-REQ-07: EventSource-Client. Aktualisiert die zwoelf Wertzellen (b1-b4,
- * c1-c4, t1-t4) bei jedem SSE-Event ohne Seiten-Reload; bei valid=false "--". */
+ * c1-c4, t1-t4) bei jedem SSE-Event ohne Seiten-Reload; bei valid=false "--".
+ * WEB-REQ-09: col() faerbt Kerntemperatur-Zellen abhaengig von Zieltemperatur. */
 static const char k_HtmlScript[] =
     "<script>"
     "var es=new EventSource('/events');"
     "function u(g,a){var i;for(i=0;i<a.length;i++){"
     "var el=document.getElementById(g+(i+1));"
     "if(el){el.innerHTML=a[i].ok?a[i].v+'&nbsp;&deg;C':'--';}}}"
+    "function col(i,cv,tv){"
+    "var el=document.getElementById('c'+(i+1));if(!el)return;"
+    "if(!tv.ok||!cv.ok){el.style.background='';el.style.color='';return;}"
+    "var d=cv.v-tv.v,"
+    "bg=(d<-10)?'#ffffff':(d<-5)?'#ffff00':(d<=5)?'#00c800':'#ff6464';"
+    "el.style.background=bg;el.style.color='#000000';}"
     "es.onmessage=function(e){var d=JSON.parse(e.data);"
-    "u('b',d.burner);u('c',d.core);u('t',d.target);};"
+    "u('b',d.burner);u('c',d.core);u('t',d.target);"
+    "for(var j=0;j<4;j++){col(j,d.core[j],d.target[j]);}};"
     "</script></body></html>";
 
 static const char k_CellPre[]   = "<div class=\"cell\"><div class=\"lbl\">";

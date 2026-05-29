@@ -274,6 +274,43 @@ Keine.
 - [x] JSON-Format festgelegt: `{"burner":[{"v":<int>,"ok":<0|1>}…],"core":[…],"target":[…]}` (kompakt, je 4 Einträge)
 - [ ] Echtdaten erst mit der Bluetooth-Implementierung; bis dahin Test über Shell-Befehl `temp set`/`temp clear`
 
+### WEB-REQ-09
+
+#### Beschreibung
+
+Jede Kerntemperatur-Zelle (c1–c4) soll farblich hervorgehoben werden, sobald für die zugehörige Zone eine Zieltemperatur gesetzt ist. Die Hintergrundfarbe richtet sich nach der Differenz zwischen aktueller Kerntemperatur und Zieltemperatur gemäß folgender Tabelle:
+
+| Bedingung | Hintergrund | Textfarbe |
+|-----------|-------------|-----------|
+| Keine Zieltemperatur gesetzt | Standard (kein Farbeingriff) | Standard |
+| Kerntemperatur < Zieltemperatur − 10 °C | Weiß (`#ffffff`) | Schwarz (`#000000`) |
+| Zieltemperatur − 10 °C ≤ Kerntemperatur < Zieltemperatur − 5 °C | Gelb (`#ffff00`) | Schwarz (`#000000`) |
+| Zieltemperatur − 5 °C ≤ Kerntemperatur ≤ Zieltemperatur + 5 °C | Grün (`#00c800`) | Schwarz (`#000000`) |
+| Kerntemperatur > Zieltemperatur + 5 °C | Hellrot (`#ff6464`) | Schwarz (`#000000`) |
+
+Die Einstufung wird bei jedem eintreffenden SSE-Event neu berechnet. Ist der Kerntemperaturwert ungültig (`ok = 0`), bleibt die Zelle ungefärbt (Standard).
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Mittel    | Umgesetzt | `app/src/webserver.c:k_HtmlScript` (`col()`-Funktion im JavaScript-Client) |
+
+#### Abhängigkeiten
+
+- WEB-REQ-04 (Kerntemperatur-Reihe)
+- WEB-REQ-05 (Zieltemperatur-Reihe)
+- WEB-REQ-07 (clientseitige Aktualisierung via EventSource)
+
+#### Abnahmekriterien
+
+- Ist für eine Zone keine Zieltemperatur gesetzt (`target[i].ok = 0`), bleibt Hintergrund und Textfarbe der zugehörigen Kerntemperatur-Zelle unverändert
+- Ist der Kerntemperaturwert ungültig (`core[i].ok = 0`), wird keine Farbe gesetzt
+- Kerntemperatur < Zieltemperatur − 10 °C → weißer Hintergrund, schwarze Schrift
+- Zieltemperatur − 10 °C ≤ Kerntemperatur < Zieltemperatur − 5 °C → gelber Hintergrund, schwarze Schrift
+- Zieltemperatur − 5 °C ≤ Kerntemperatur ≤ Zieltemperatur + 5 °C → grüner Hintergrund, schwarze Schrift
+- Kerntemperatur > Zieltemperatur + 5 °C → hellroter Hintergrund, schwarze Schrift
+- Die Farbe wird bei jedem SSE-Event aktualisiert (kein Seiten-Reload erforderlich)
+- Die Farblogik ist ausschließlich im JavaScript-Client implementiert; der Server sendet keine CSS-Klassen oder Inline-Styles
+
 ---
 
 ## 5. Änderungshistorie
@@ -288,3 +325,5 @@ Keine.
 | 1.5     | 2026-05-28 |       | Entscheidung dokumentiert: TLS im Heimnetzwerk nicht erforderlich (nur HTTP) |
 | 1.6     | 2026-05-28 |       | WEB-REQ-08 ergänzt und umgesetzt: maximal 3 gleichzeitige HTTP-Verbindungen |
 | 1.7     | 2026-05-29 |       | WEB-REQ-06/07 umgesetzt: SSE-Endpoint `/events` mit Push bei Wertänderung, clientseitige Aktualisierung via `EventSource`; JSON-Format und Ein-Client-Einschränkung dokumentiert |
+| 1.8     | 2026-05-29 |       | WEB-REQ-09 ergänzt: farbliche Hervorhebung der Kerntemperatur-Zellen in Abhängigkeit von der Zieltemperatur |
+| 1.9     | 2026-05-29 |       | WEB-REQ-09 umgesetzt: `col()`-Funktion im JavaScript-Client (`k_HtmlScript`) |

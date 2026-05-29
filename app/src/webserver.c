@@ -15,9 +15,10 @@ LOG_MODULE_REGISTER(webserver, LOG_LEVEL_ERR);
 static uint16_t g_HttpPort = 80U;
 
 /* WEB-NFR-02: Statischer Antwortpuffer fuer die HTML-Seite.
- * Erhoeht von 3072 auf 6144 fuer die Anzeigen nach DSP-REQ-01..05
- * (CSS + vier Zonenbloecke + JavaScript fuer Profilumschaltung). */
-#define HTML_BUF_SIZE (6144U)
+ * Schrittweise erhoeht: 3072 → 6144 (DSP-REQ-01..05: Bloecke + JS)
+ *                         → 8192 (DSP-REQ-06: Gas-Anzeige + erweitertes JS,
+ *                                  inkl. Reserve fuer kuenftige Anzeigen). */
+#define HTML_BUF_SIZE (8192U)
 static uint8_t g_HtmlBuf[HTML_BUF_SIZE];
 
 /* WEB-REQ-06: Statischer Antwortpuffer fuer einen SSE-Event (data: {json}\n\n) */

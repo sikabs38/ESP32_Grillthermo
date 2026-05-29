@@ -1,4 +1,4 @@
-/* WEB-REQ-01..09, TMP-REQ-02, TMP-REQ-03 */
+/* WEB-REQ-01..09, TMP-REQ-02, TMP-REQ-03, DSP-REQ-01..05 */
 #include "webserver.h"
 #include "temp_data.h"
 
@@ -14,8 +14,10 @@ LOG_MODULE_REGISTER(webserver, LOG_LEVEL_ERR);
 
 static uint16_t g_HttpPort = 80U;
 
-/* WEB-NFR-02: Statischer Antwortpuffer fuer die HTML-Seite */
-#define HTML_BUF_SIZE (3072U)
+/* WEB-NFR-02: Statischer Antwortpuffer fuer die HTML-Seite.
+ * Erhoeht von 3072 auf 6144 fuer die Anzeigen nach DSP-REQ-01..05
+ * (CSS + vier Zonenbloecke + JavaScript fuer Profilumschaltung). */
+#define HTML_BUF_SIZE (6144U)
 static uint8_t g_HtmlBuf[HTML_BUF_SIZE];
 
 /* WEB-REQ-06: Statischer Antwortpuffer fuer einen SSE-Event (data: {json}\n\n) */
@@ -36,60 +38,142 @@ static const char k_HtmlA[] =
     "<!DOCTYPE html><html>"
     "<head><meta charset=\"utf-8\"><title>";
 
-/* CSS + oeffnendes <h1> (Hostname folgt danach) */
-static const char k_HtmlB[] =
+/* DSP-REQ-01..04: Layout fuer vier Zonenbloecke, Profilauswahl und Farbbalken. */
+static const char k_HtmlCss[] =
     "</title>"
     "<style>"
-    "body{font-family:sans-serif;margin:0;padding:16px;}"
-    ".hdr{width:100%;box-sizing:border-box;text-align:center;"
-    "background:#f4f4f4;padding:16px;border:2px solid black;}"
-    ".row{display:flex;justify-content:space-around;margin:4px 0 16px;}"
-    ".cell{border:1px solid #ccc;border-radius:4px;padding:12px 20px;"
-    "text-align:center;flex:1;margin:0 4px;}"
-    ".lbl{font-size:12px;color:#666;}"
-    ".val{font-size:24px;font-weight:bold;margin-top:4px;}"
-    "h2{margin:12px 0 4px;}"
-    "</style>"
-    "</head><body>"
+    "body{font-family:sans-serif;margin:0;padding:12px;background:#fafafa;color:#222;}"
+    ".hdr{text-align:center;background:#f4f4f4;padding:12px;"
+    "border:2px solid #000;border-radius:6px;}"
+    ".pr{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:14px 0;}"
+    ".ch{padding:6px 14px;border:1px solid #888;border-radius:14px;"
+    "background:#fff;color:#222;cursor:pointer;font:inherit;}"
+    ".ch.a{background:#0a7;border-color:#0a7;color:#fff;}"
+    ".bl{border:1px solid #ccc;border-radius:6px;padding:10px;margin:10px 0;"
+    "background:#fff;}"
+    ".zh{font-weight:bold;margin-bottom:8px;text-align:center;color:#555;}"
+    ".ds{display:flex;gap:14px;}"
+    ".dp{flex:1;text-align:center;min-width:0;}"
+    ".dt{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.5px;}"
+    ".vl{font-size:28px;font-weight:bold;margin:2px 0;}"
+    ".br{position:relative;height:16px;border-radius:8px;background:#ddd;"
+    "margin:8px 0 4px;overflow:visible;}"
+    ".in{position:absolute;top:-3px;width:3px;height:22px;background:#000;"
+    "left:0%;transform:translateX(-50%);transition:left .25s;}"
+    ".zn{margin-top:4px;font-size:13px;color:#222;min-height:1em;}"
+    ".lg{font-size:11px;color:#666;margin-top:6px;}"
+    ".dot{display:inline-block;width:8px;height:8px;border-radius:50%;"
+    "margin:0 3px 0 8px;vertical-align:middle;}"
+    "</style></head><body>"
     "<div class=\"hdr\"><h1>";
 
-static const char k_HtmlAfterH1[]  = "</h1></div>";
-static const char k_HtmlSec1[]     = "<h2>Brennertemperatur</h2><div class=\"row\">";
-static const char k_HtmlSec2[]     = "</div><h2>Kerntemperatur</h2><div class=\"row\">";
-static const char k_HtmlSec3[]     = "</div><h2>Zieltemperatur</h2><div class=\"row\">";
-static const char k_HtmlRowEnd[]   = "</div>";
+static const char k_HtmlAfterH1[] = "</h1></div>";
 
-/* WEB-REQ-07: EventSource-Client. Aktualisiert die zwoelf Wertzellen (b1-b4,
- * c1-c4, t1-t4) bei jedem SSE-Event ohne Seiten-Reload; bei valid=false "--".
- * WEB-REQ-09: col() faerbt Kerntemperatur-Zellen abhaengig von Zieltemperatur. */
+/* DSP-REQ-04: Profil-Auswahl-Leiste oberhalb der Bloecke */
+static const char k_HtmlProfiles[] =
+    "<div class=\"pr\">"
+    "<button class=\"ch a\" data-p=\"rind\">Rind</button>"
+    "<button class=\"ch\" data-p=\"schwein\">Schwein</button>"
+    "<button class=\"ch\" data-p=\"gefluegel\">Gefl&uuml;gel</button>"
+    "<button class=\"ch\" data-p=\"fisch\">Fisch</button>"
+    "</div>";
+
+/* DSP-REQ-01: Block-Fragmente (ein Block je Grillzone) */
+static const char k_BlockOpen[]  = "<div class=\"bl\"><div class=\"zh\">Zone ";
+static const char k_BlockMid[]   = "</div><div class=\"ds\">";
+static const char k_BlockClose[] = "</div></div>";
+
+/* DSP-REQ-02 / DSP-REQ-03: Anzeige-Fragmente.
+ * id-Praefix b -> Garraum, c -> Kern; angehaengte Ziffer 1..4 = Zonenindex. */
+static const char k_DispOpenA[]  = "<div class=\"dp\" id=\"";  /* + "bN" / "cN" */
+static const char k_DispOpenB[]  = "\"><div class=\"dt\">";    /* + Label */
+static const char k_DispMid[]    = "</div><div class=\"vl\">"; /* + Wert oder "--" */
+static const char k_DispBar[]    =
+    "</div><div class=\"br\"><div class=\"in\"></div></div>"
+    "<div class=\"zn\"></div>";
+static const char k_DispLegend[] = "<div class=\"lg\"></div>";
+static const char k_DispClose[]  = "</div>";
+
+static const char k_LblGarraum[] = "Garraum";
+static const char k_LblKern[]    = "Kern";
+static const char k_NotAvail[]   = "--";
+static const char k_DegUnit[]    = "&nbsp;&deg;C";
+
+/* DSP-REQ-02..05 + WEB-REQ-07: clientseitige Logik
+ *   GR  = Garraum-Konfiguration (Bereich 0..450 °C, Farbbaender, Zonennamen)
+ *   PR  = Grillgut-Profile (Rind, Schwein, Gefluegel, Fisch) mit Garstufen
+ *   cp  = aktives Profil (Default 'rind')
+ *   LD  = letzte SSE-Werte, damit Profilwechsel Kernanzeige sofort neu rendert
+ *   up(): aktualisiert Wert, Indikatorposition und Zonen-/Garstufenname.
+ *         Klemmt unterhalb p.mn auf 0%, oberhalb p.mx auf 100% mit letzter Stufe.
+ *   setPr(): wechselt Profil, faerbt Kern-Baender neu, baut Legende, rendert. */
 static const char k_HtmlScript[] =
     "<script>"
+    "var GR={mn:0,mx:450,"
+    "bd:[{f:0,t:149,c:'#3080ff'},{f:150,t:299,c:'#ff9030'},"
+    "{f:300,t:450,c:'#e03030'}],"
+    "zn:[{f:0,t:99,n:'Aufheizen'},{f:100,t:179,n:'Low & Slow'},"
+    "{f:180,t:279,n:'Direktes Grillen'},{f:280,t:399,n:'Searing'},"
+    "{f:400,t:450,n:'Maximale Hitze'}]};"
+    "var PR={"
+    "rind:{mn:48,mx:75,s:[{f:48,t:54,c:'#3080ff',n:'Rare'},"
+    "{f:54,t:58,c:'#30b040',n:'Medium Rare'},"
+    "{f:58,t:63,c:'#ff9030',n:'Medium'},"
+    "{f:63,t:75,c:'#e03030',n:'Well Done'}]},"
+    "schwein:{mn:60,mx:85,s:[{f:60,t:65,c:'#30b040',n:'Rosa'},"
+    "{f:65,t:75,c:'#ff9030',n:'Durch'},"
+    "{f:75,t:85,c:'#e03030',n:'Sehr durch'}]},"
+    "gefluegel:{mn:74,mx:90,s:[{f:74,t:82,c:'#30b040',n:'Ziel'},"
+    "{f:82,t:90,c:'#ff9030',n:'Sicher'}]},"
+    "fisch:{mn:45,mx:72,s:[{f:45,t:52,c:'#3080ff',n:'Glasig'},"
+    "{f:52,t:62,c:'#30b040',n:'Durch'},"
+    "{f:62,t:72,c:'#e03030',n:'Zu durch'}]}};"
+    "var cp='rind';"
+    "var LD={b:[null,null,null,null],c:[null,null,null,null]};"
+    "function grad(mn,mx,a){var p=[],i,b,p1,p2;"
+    "for(i=0;i<a.length;i++){b=a[i];"
+    "p1=((b.f-mn)/(mx-mn)*100).toFixed(1);"
+    "p2=((b.t-mn)/(mx-mn)*100).toFixed(1);"
+    "p.push(b.c+' '+p1+'%',b.c+' '+p2+'%');}"
+    "return 'linear-gradient(to right,'+p.join(',')+')';}"
+    "function nm(v,a){var i;for(i=0;i<a.length;i++){"
+    "if(v>=a[i].f&&v<=a[i].t)return a[i].n;}return '';}"
+    "function up(id,e,p){var c=document.getElementById(id);if(!c)return;"
+    "var vl=c.querySelector('.vl'),ind=c.querySelector('.in'),"
+    "zo=c.querySelector('.zn');"
+    "if(!e||!e.ok){vl.innerHTML='--';ind.style.left='0%';zo.textContent='';return;}"
+    "vl.innerHTML=e.v+'&nbsp;&deg;C';"
+    "var arr=p.s||p.zn,pos,sn='';"
+    "if(e.v<p.mn){pos=0;}"
+    "else if(e.v>p.mx){pos=100;sn=arr[arr.length-1].n;}"
+    "else{pos=(e.v-p.mn)/(p.mx-p.mn)*100;sn=nm(e.v,arr);}"
+    "ind.style.left=pos+'%';zo.textContent=sn;}"
+    "function setPr(n){cp=n;var p=PR[n],i,j,bar,lg,h;"
+    "var ch=document.querySelectorAll('.ch');"
+    "for(i=0;i<ch.length;i++)ch[i].classList.toggle('a',ch[i].dataset.p===n);"
+    "for(i=1;i<=4;i++){"
+    "bar=document.querySelector('#c'+i+' .br');"
+    "bar.style.background=grad(p.mn,p.mx,p.s);"
+    "lg=document.querySelector('#c'+i+' .lg');h='';"
+    "for(j=0;j<p.s.length;j++)"
+    "h+='<span class=\"dot\" style=\"background:'+p.s[j].c+'\"></span>'+p.s[j].n;"
+    "lg.innerHTML=h;"
+    "if(LD.c[i-1])up('c'+i,LD.c[i-1],p);}}"
+    "for(var i=1;i<=4;i++)"
+    "document.querySelector('#b'+i+' .br').style.background=grad(GR.mn,GR.mx,GR.bd);"
+    "setPr('rind');"
+    "var ch=document.querySelectorAll('.ch');"
+    "for(var k=0;k<ch.length;k++)ch[k].onclick=function(){setPr(this.dataset.p);};"
     "var es=new EventSource('/events');"
-    "function u(g,a){var i;for(i=0;i<a.length;i++){"
-    "var el=document.getElementById(g+(i+1));"
-    "if(el){el.innerHTML=a[i].ok?a[i].v+'&nbsp;&deg;C':'--';}}}"
-    "function col(i,cv,tv){"
-    "var el=document.getElementById('c'+(i+1));if(!el)return;"
-    "if(!tv.ok||!cv.ok){el.style.background='';el.style.color='';return;}"
-    "var d=cv.v-tv.v,"
-    "bg=(d<-10)?'#ffffff':(d<-5)?'#ffff00':(d<=5)?'#00c800':'#ff6464';"
-    "el.style.background=bg;el.style.color='#000000';}"
-    "es.onmessage=function(e){var d=JSON.parse(e.data);"
-    "u('b',d.burner);u('c',d.core);u('t',d.target);"
-    "for(var j=0;j<4;j++){col(j,d.core[j],d.target[j]);}};"
+    "es.onmessage=function(e){var d=JSON.parse(e.data),i;"
+    "for(i=0;i<4;i++){LD.b[i]=d.burner[i];LD.c[i]=d.core[i];"
+    "up('b'+(i+1),d.burner[i],GR);"
+    "up('c'+(i+1),d.core[i],PR[cp]);}};"
     "</script></body></html>";
-
-static const char k_CellPre[]   = "<div class=\"cell\"><div class=\"lbl\">";
-static const char k_CellMidA[]  = "</div><div class=\"val\" id=\"";
-static const char k_CellMidB[]  = "\">";
-static const char k_CellPost[]  = "</div></div>";
-static const char k_CellNA[]    = "--";
-static const char k_DegUnit[]   = "&nbsp;&deg;C";
 
 /* WEB-REQ-06: SSE-Rahmen und JSON-Fragmente (kompaktes Format) */
 static const char k_SseDataPre[]  = "data: {\"burner\":[";
 static const char k_SseCore[]     = "],\"core\":[";
-static const char k_SseTarget[]   = "],\"target\":[";
 static const char k_SseDataPost[] = "]}\n\n";
 static const char k_SseKeepAlive[] = ": ka\n\n";
 static const char k_JsonEntryPre[] = "{\"v\":";
@@ -151,34 +235,38 @@ static void Buf_AppendInt16(BufCtx_t *ctx, int16_t val)
 }
 
 /* ------------------------------------------------------------------ */
-/* Temperaturzelle                                                     */
+/* Anzeige (DSP-REQ-02 Garraum / DSP-REQ-03 Kern)                      */
 /* ------------------------------------------------------------------ */
 
-/* WEB-REQ-07: group ('b','c','t') + num (1..4) ergeben die stabile Zell-ID */
-static void Html_AppendCell(BufCtx_t *ctx, char group, uint8_t num,
-                            const Temp_Entry_t *entry)
+/* group: 'b' = Garraum, 'c' = Kern. zoneCh: ASCII-Ziffer '1'..'4'.
+ * withLegend = true bei Kernanzeige (DSP-REQ-03: Legende mit Garstufen). */
+static void Html_AppendDisplay(BufCtx_t *ctx, char group, char zoneCh,
+                               const char *label, size_t labelLen,
+                               const Temp_Entry_t *entry, bool withLegend)
 {
-    char numChar = (char)('0' + (char)num);
-
-    Buf_Append(ctx, k_CellPre,  sizeof(k_CellPre)  - 1U);
-    Buf_Append(ctx, &numChar, 1U);
-    Buf_Append(ctx, k_CellMidA, sizeof(k_CellMidA) - 1U);
+    Buf_Append(ctx, k_DispOpenA, sizeof(k_DispOpenA) - 1U);
     Buf_Append(ctx, &group, 1U);
-    Buf_Append(ctx, &numChar, 1U);
-    Buf_Append(ctx, k_CellMidB, sizeof(k_CellMidB) - 1U);
+    Buf_Append(ctx, &zoneCh, 1U);
+    Buf_Append(ctx, k_DispOpenB, sizeof(k_DispOpenB) - 1U);
+    Buf_Append(ctx, label, labelLen);
+    Buf_Append(ctx, k_DispMid, sizeof(k_DispMid) - 1U);
 
     if (entry->valid) {
         Buf_AppendInt16(ctx, entry->value);
         Buf_Append(ctx, k_DegUnit, sizeof(k_DegUnit) - 1U);
     } else {
-        Buf_Append(ctx, k_CellNA, sizeof(k_CellNA) - 1U);
+        Buf_Append(ctx, k_NotAvail, sizeof(k_NotAvail) - 1U);
     }
 
-    Buf_Append(ctx, k_CellPost, sizeof(k_CellPost) - 1U);
+    Buf_Append(ctx, k_DispBar, sizeof(k_DispBar) - 1U);
+    if (withLegend) {
+        Buf_Append(ctx, k_DispLegend, sizeof(k_DispLegend) - 1U);
+    }
+    Buf_Append(ctx, k_DispClose, sizeof(k_DispClose) - 1U);
 }
 
 /* ------------------------------------------------------------------ */
-/* Vollstaendige Seite aufbauen                          WEB-REQ-02ff  */
+/* Vollstaendige Seite aufbauen          WEB-REQ-02ff, DSP-REQ-01..05  */
 /* ------------------------------------------------------------------ */
 
 static int Webserver_BuildHtml(const char *hostname, const Temp_Data_t *data)
@@ -187,33 +275,38 @@ static int Webserver_BuildHtml(const char *hostname, const Temp_Data_t *data)
                      .pos = 0U, .overflow = false };
     size_t   hLen = strlen(hostname);
     uint8_t  i;
+    char     zoneCh;
 
-    Buf_Append(&ctx, k_HtmlA,      sizeof(k_HtmlA)      - 1U);
-    Buf_Append(&ctx, hostname,     hLen);
-    Buf_Append(&ctx, k_HtmlB,      sizeof(k_HtmlB)      - 1U);
-    Buf_Append(&ctx, hostname,     hLen);
-    Buf_Append(&ctx, k_HtmlAfterH1,sizeof(k_HtmlAfterH1)- 1U);
+    Buf_Append(&ctx, k_HtmlA,       sizeof(k_HtmlA)       - 1U);
+    Buf_Append(&ctx, hostname,      hLen);
+    Buf_Append(&ctx, k_HtmlCss,     sizeof(k_HtmlCss)     - 1U);
+    Buf_Append(&ctx, hostname,      hLen);
+    Buf_Append(&ctx, k_HtmlAfterH1, sizeof(k_HtmlAfterH1) - 1U);
 
-    /* WEB-REQ-03: Brennertemperatur (Zell-IDs b1..b4) */
-    Buf_Append(&ctx, k_HtmlSec1, sizeof(k_HtmlSec1) - 1U);
+    /* DSP-REQ-04: Profil-Auswahl */
+    Buf_Append(&ctx, k_HtmlProfiles, sizeof(k_HtmlProfiles) - 1U);
+
+    /* DSP-REQ-01: vier Zonenbloecke, je mit Garraum- und Kernanzeige */
     for (i = 0U; i < (uint8_t)TEMP_ZONE_COUNT; i++) {
-        Html_AppendCell(&ctx, 'b', (uint8_t)(i + 1U), &data->burner[i]);
+        zoneCh = (char)('0' + (char)(i + 1U));
+
+        Buf_Append(&ctx, k_BlockOpen, sizeof(k_BlockOpen) - 1U);
+        Buf_Append(&ctx, &zoneCh, 1U);
+        Buf_Append(&ctx, k_BlockMid, sizeof(k_BlockMid) - 1U);
+
+        /* DSP-REQ-02: Garraum (id "bN") */
+        Html_AppendDisplay(&ctx, 'b', zoneCh,
+                           k_LblGarraum, sizeof(k_LblGarraum) - 1U,
+                           &data->burner[i], false);
+        /* DSP-REQ-03: Kern (id "cN") mit Legende */
+        Html_AppendDisplay(&ctx, 'c', zoneCh,
+                           k_LblKern, sizeof(k_LblKern) - 1U,
+                           &data->core[i], true);
+
+        Buf_Append(&ctx, k_BlockClose, sizeof(k_BlockClose) - 1U);
     }
 
-    /* WEB-REQ-04: Kerntemperatur (Zell-IDs c1..c4) */
-    Buf_Append(&ctx, k_HtmlSec2, sizeof(k_HtmlSec2) - 1U);
-    for (i = 0U; i < (uint8_t)TEMP_ZONE_COUNT; i++) {
-        Html_AppendCell(&ctx, 'c', (uint8_t)(i + 1U), &data->core[i]);
-    }
-
-    /* WEB-REQ-05: Zieltemperatur (Zell-IDs t1..t4) */
-    Buf_Append(&ctx, k_HtmlSec3, sizeof(k_HtmlSec3) - 1U);
-    for (i = 0U; i < (uint8_t)TEMP_ZONE_COUNT; i++) {
-        Html_AppendCell(&ctx, 't', (uint8_t)(i + 1U), &data->target[i]);
-    }
-
-    Buf_Append(&ctx, k_HtmlRowEnd, sizeof(k_HtmlRowEnd) - 1U);
-    /* WEB-REQ-07: clientseitiges EventSource-Script */
+    /* WEB-REQ-07 + DSP-REQ-04/05: clientseitige Logik */
     Buf_Append(&ctx, k_HtmlScript, sizeof(k_HtmlScript) - 1U);
 
     if (ctx.overflow) {
@@ -256,8 +349,6 @@ static int Webserver_BuildSseData(const Temp_Data_t *data)
     Sse_AppendGroup(&ctx, data->burner);
     Buf_Append(&ctx, k_SseCore, sizeof(k_SseCore) - 1U);
     Sse_AppendGroup(&ctx, data->core);
-    Buf_Append(&ctx, k_SseTarget, sizeof(k_SseTarget) - 1U);
-    Sse_AppendGroup(&ctx, data->target);
     Buf_Append(&ctx, k_SseDataPost, sizeof(k_SseDataPost) - 1U);
 
     if (ctx.overflow) {

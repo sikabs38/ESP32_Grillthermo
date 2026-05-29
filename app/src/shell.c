@@ -731,8 +731,6 @@ static int Shell_TempParseGroup(const char *name, uint8_t *group)
         *group = (uint8_t)TEMP_GROUP_BURNER;
     } else if (strcmp(name, "core") == 0) {
         *group = (uint8_t)TEMP_GROUP_CORE;
-    } else if (strcmp(name, "target") == 0) {
-        *group = (uint8_t)TEMP_GROUP_TARGET;
     } else {
         return -EINVAL;
     }
@@ -774,7 +772,7 @@ static int Shell_CmdTempSet(const struct shell *sh, size_t argc, char **argv)
     }
 
     if (Shell_TempParseGroup(argv[1], &group) != 0) {
-        shell_error(sh, "Ungueltige Gruppe: burner, core oder target.");
+        shell_error(sh, "Ungueltige Gruppe: burner oder core.");
         return -EINVAL;
     }
 
@@ -817,7 +815,7 @@ static int Shell_CmdTempClear(const struct shell *sh, size_t argc, char **argv)
     }
 
     if (Shell_TempParseGroup(argv[1], &group) != 0) {
-        shell_error(sh, "Ungueltige Gruppe: burner, core oder target.");
+        shell_error(sh, "Ungueltige Gruppe: burner oder core.");
         return -EINVAL;
     }
 
@@ -860,9 +858,9 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_config,
 );
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_temp,
-    SHELL_CMD_ARG(set,   NULL, "Wert setzen: <burner|core|target> <1-4> <wert>",
+    SHELL_CMD_ARG(set,   NULL, "Wert setzen: <burner|core> <1-4> <wert>",
                   Shell_CmdTempSet,   4, 0),
-    SHELL_CMD_ARG(clear, NULL, "Wert auf -- setzen: <burner|core|target> <1-4>",
+    SHELL_CMD_ARG(clear, NULL, "Wert auf -- setzen: <burner|core> <1-4>",
                   Shell_CmdTempClear, 3, 0),
     SHELL_SUBCMD_SET_END
 );

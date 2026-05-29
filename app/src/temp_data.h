@@ -21,7 +21,6 @@ typedef struct {
 typedef struct {
     Temp_Entry_t burner[TEMP_ZONE_COUNT]; /* Brennertemperaturen */
     Temp_Entry_t core[TEMP_ZONE_COUNT];   /* Kerntemperaturen (Fleischthermometer) */
-    Temp_Entry_t target[TEMP_ZONE_COUNT]; /* Zieltemperaturen */
 } Temp_Data_t;
 
 /* TMP-REQ-02: Global verfuegbare Datenstruktur und Mutex */
@@ -37,7 +36,6 @@ extern uint32_t         g_TempGen;
 /* TMP-REQ-03: Gruppenindex fuer Temp_Set() */
 #define TEMP_GROUP_BURNER (0U)
 #define TEMP_GROUP_CORE   (1U)
-#define TEMP_GROUP_TARGET (2U)
 
 /* TMP-REQ-03: Einzelnen Messwert setzen, Generationszaehler erhoehen und Warter
  * wecken — alles atomar unter g_TempMutex.

@@ -16,7 +16,6 @@ Die Temperaturdaten sollen in einer Struct `Temp_Data_t` gespeichert werden. Jed
 
 - 4 Brennertemperaturen (`burner[4]`): Initialisierungswert 20 °C, `valid = true`
 - 4 Kerntemperaturen (`core[4]`): Initialisierungswert 0 °C, `valid = false`
-- 4 Zieltemperaturen (`target[4]`): Initialisierungswert 0 °C, `valid = false`
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
@@ -29,9 +28,9 @@ Keine.
 #### Abnahmekriterien
 
 - `Temp_Entry_t` enthält genau die Felder `value` (int16_t) und `valid` (bool)
-- `Temp_Data_t` enthält `burner[4]`, `core[4]` und `target[4]` vom Typ `Temp_Entry_t`
+- `Temp_Data_t` enthält `burner[4]` und `core[4]` vom Typ `Temp_Entry_t`
 - Nach dem Start zeigen alle vier Brenner 20 °C an (`valid = true`)
-- Nach dem Start zeigen alle Kern- und Zieltemperaturen `--` an (`valid = false`)
+- Nach dem Start zeigen alle Kerntemperaturen `--` an (`valid = false`)
 - Ein gesetzter Wert von 0 °C wird als `0 °C` angezeigt, nicht als `--`
 
 ---
@@ -117,3 +116,4 @@ Keine.
 |---------|------------|-------|----------|
 | 1.0     | 2026-05-28 |       | Erstellt: TMP-REQ-01 (Struct), TMP-REQ-02 (Mutex) |
 | 1.1     | 2026-05-29 |       | TMP-REQ-03 ergänzt und umgesetzt: Änderungssignal (`g_TempGen`, `g_TempCondvar`, `Temp_Set`, `Temp_NotifyChanged`) |
+| 1.2     | 2026-05-29 |       | `target[4]` und `TEMP_GROUP_TARGET` entfernt — die Zieltemperatur wird durch die Grillgut-Profile aus DSP-REQ-04 abgelöst |

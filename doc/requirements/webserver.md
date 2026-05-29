@@ -111,23 +111,11 @@ Unterhalb der Brennertemperatur-Reihe soll eine weitere Reihe mit vier Temperatu
 
 ### WEB-REQ-05
 
-#### Beschreibung
-
-Unterhalb der Kerntemperatur-Reihe soll eine Reihe mit vier Feldern für die Zieltemperatur der einzelnen Zonen dargestellt werden. Die Felder sind mit 1 bis 4 nummeriert. Oberhalb der Reihe erscheint die Überschrift „Zieltemperatur".
+> **Abgelöst durch DSP-REQ-01..04** (siehe `doc/requirements/display.md`). Die separate Zieltemperatur-Reihe entfällt: An ihre Stelle treten die vier Zonenblöcke mit profilabhängiger Farbskala je Kerntemperatur-Anzeige. Das Feld `target[]` wurde aus `Temp_Data_t` entfernt; die Shell-Befehle `temp set target` / `temp clear target` existieren nicht mehr.
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Mittel    | Umgesetzt | `app/src/webserver.c:k_HtmlC` (statisches HTML, Platzhalterwerte `-- °C`) |
-
-#### Abhängigkeiten
-
-- WEB-REQ-03 (Brennertemperatur-Reihe)
-
-#### Abnahmekriterien
-
-- Die Überschrift „Zieltemperatur" erscheint über der Reihe
-- Vier Felder, nummeriert 1–4, werden in einer horizontalen Reihe dargestellt
-- Ohne aktive Konfiguration wird `-- °C` als Platzhalterwert angezeigt
+| Mittel    | Abgelöst | — (ersetzt durch DSP-REQ-01..04) |
 
 ---
 
@@ -139,7 +127,7 @@ Der Webserver soll einen Server-Sent-Events-Endpoint (`/events`) bereitstellen, 
 
 Die Erkennung neuer Messwerte erfolgt über ein Änderungssignal des Temperaturdaten-Moduls: Der schreibende Erzeuger (künftig das Bluetooth-Modul) signalisiert nach jeder Aktualisierung von `g_TempData`, dass neue Werte vorliegen. Der SSE-Handler wartet auf dieses Signal, liest die Daten unter Mutex-Schutz und sendet sie.
 
-Die Werte werden als JSON-Objekt übertragen, das für die drei Gruppen `burner`, `core` und `target` je vier Einträge mit Temperaturwert und Gültigkeitsflag enthält. Format (kompakt): `{"burner":[{"v":20,"ok":1},…×4],"core":[…],"target":[…]}` — `v` = Wert in °C, `ok` = 1 (gültig) bzw. 0 (`--`).
+Die Werte werden als JSON-Objekt übertragen, das für die beiden Gruppen `burner` und `core` je vier Einträge mit Temperaturwert und Gültigkeitsflag enthält. Format (kompakt): `{"burner":[{"v":20,"ok":1},…×4],"core":[…]}` — `v` = Wert in °C, `ok` = 1 (gültig) bzw. 0 (`--`). Die Gruppe `target` wurde mit der Ablösung von WEB-REQ-05 durch DSP-REQ-01..04 entfernt.
 
 > **Einschränkung (bewusst akzeptiert):** Der Zephyr-HTTP-Server arbeitet einthreadig; der SSE-Handler blockiert während des Streamens auf der Bedingungsvariablen und belegt diesen Thread dauerhaft. Dadurch ist effektiv nur **ein** `/events`-Client gleichzeitig bedienbar — ein zweiter Browser erhält erst nach Abbau der ersten SSE-Verbindung eine Antwort. Dies weicht vom 3-Client-Ziel aus WEB-REQ-08 ab und wurde so entschieden.
 
@@ -158,7 +146,7 @@ Die Werte werden als JSON-Objekt übertragen, das für die drei Gruppen `burner`
 - `GET /events` liefert die Antwort mit `Content-Type: text/event-stream`
 - Beim Verbindungsaufbau wird der aktuelle Messwert-Stand einmalig gesendet
 - Ein neuer `data:`-Event wird nur bei tatsächlicher Wertänderung gesendet (kein festes Sende-Intervall ohne Änderung)
-- Das JSON enthält für `burner[4]`, `core[4]` und `target[4]` je Wert (`value`) und Gültigkeit (`valid`)
+- Das JSON enthält für `burner[4]` und `core[4]` je Wert (`value`) und Gültigkeit (`valid`)
 - Der Zugriff auf `g_TempData` erfolgt zwischen `k_mutex_lock` und `k_mutex_unlock`
 - Kein Aufruf von `malloc`, `calloc`, `realloc` oder `free`
 - Bei längerer Inaktivität (keine Wertänderung) wird ein SSE-Kommentar (`: ka`) als Keepalive gesendet; eine abgebrochene Verbindung wird beim nächsten Sendeversuch erkannt und der Stream-Zustand zurückgesetzt
@@ -170,18 +158,18 @@ Die Werte werden als JSON-Objekt übertragen, das für die drei Gruppen `burner`
 
 #### Beschreibung
 
-Die Startseite soll JavaScript enthalten, das beim Laden eine `EventSource`-Verbindung zum `/events`-Endpoint (WEB-REQ-06) öffnet und bei jedem eintreffenden Event die zwölf Temperaturzellen (Brenner, Kern, Ziel) direkt im DOM aktualisiert, ohne die gesamte Seite neu zu laden. Ungültige Werte (`valid = false`) werden weiterhin als `--` dargestellt, gültige Werte als `<Wert> °C`.
+Die Startseite soll JavaScript enthalten, das beim Laden eine `EventSource`-Verbindung zum `/events`-Endpoint (WEB-REQ-06) öffnet und bei jedem eintreffenden Event die acht Temperaturanzeigen (Garraum und Kern je Zone) direkt im DOM aktualisiert, ohne die gesamte Seite neu zu laden. Ungültige Werte (`valid = false`) werden weiterhin als `--` dargestellt, gültige Werte als `<Wert> °C`.
 
-Damit die Aktualisierung gezielt erfolgen kann, erhält jede Temperaturzelle einen stabilen, eindeutigen Bezeichner (`id`-Attribut): `b1`–`b4` (Brenner), `c1`–`c4` (Kern), `t1`–`t4` (Ziel).
+Damit die Aktualisierung gezielt erfolgen kann, erhält jeder Anzeigeblock einen stabilen, eindeutigen Bezeichner (`id`-Attribut): `b1`–`b4` (Garraum), `c1`–`c4` (Kern).
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Mittel    | Umgesetzt | `app/src/webserver.c:k_HtmlScript` (EventSource-Client), `Html_AppendCell()` (Zell-IDs `b1`…`t4`) |
+| Mittel    | Umgesetzt | `app/src/webserver.c:k_HtmlScript` (EventSource-Client + `up()`-Funktion), `Html_AppendDisplay()` (IDs `b1`–`b4`, `c1`–`c4`) |
 
 #### Abhängigkeiten
 
 - WEB-REQ-06 (SSE-Endpoint)
-- WEB-REQ-03, WEB-REQ-04, WEB-REQ-05 (anzuzeigende Zellen)
+- DSP-REQ-02, DSP-REQ-03 (Garraum- und Kerntemperatur-Anzeige)
 
 #### Abnahmekriterien
 
@@ -266,50 +254,21 @@ Keine.
 
 ## 4. Offene Punkte / Annahmen
 
-- [ ] Temperaturwerte (WEB-REQ-03/04/05) zeigen aktuell Platzhalterwerte; Echtdaten abhängig von der Bluetooth-Implementierung
+- [ ] Temperaturwerte (WEB-REQ-03/04) zeigen aktuell Platzhalterwerte; Echtdaten abhängig von der Bluetooth-Implementierung
 - [x] **HTTPS / TLS ist nicht erforderlich.** Das Gerät wird ausschließlich im vertrauten Heimnetzwerk betrieben, überträgt keine sensiblen Daten (nur Grill-Messwerte) und ist nicht öffentlich erreichbar. Der Sicherheitsgewinn wäre gering, die Kosten dagegen hoch: ~60 KB mbedTLS-Heap plus TLS-Kontext je Verbindung (konkurriert mit WiFi-Stack und Netzwerkpuffern), zusätzlicher Flash-Bedarf sowie dauerhafte Browser-Warnungen mangels vertrauenswürdigem Zertifikat im LAN. Entscheidung: bewusst nur HTTP auf Port 80.
 - [x] Gleichzeitige HTTP-Verbindungen auf maximal 3 begrenzt (siehe WEB-REQ-08)
 - [x] Änderungssignal des Temperaturdaten-Moduls umgesetzt (TMP-REQ-03: `g_TempGen`, `g_TempCondvar`, `Temp_Set`, `Temp_NotifyChanged`)
 - [x] **SSE bedient nur einen Client gleichzeitig** — bewusst akzeptiert. Der einthreadige Zephyr-HTTP-Server ruft dynamische Handler synchron in einer `do-while(!final_chunk)`-Schleife auf; ein blockierender SSE-Handler belegt den einzigen Server-Thread. Echte Mehrfach-Live-Updates erforderten einen Worker-/Poll-basierten Ansatz oder mehrere Server-Threads.
-- [x] JSON-Format festgelegt: `{"burner":[{"v":<int>,"ok":<0|1>}…],"core":[…],"target":[…]}` (kompakt, je 4 Einträge)
-- [ ] Echtdaten erst mit der Bluetooth-Implementierung; bis dahin Test über Shell-Befehl `temp set`/`temp clear`
+- [x] JSON-Format festgelegt: `{"burner":[{"v":<int>,"ok":<0|1>}…],"core":[…]}` (kompakt, je 4 Einträge — `target` entfernt mit WEB-REQ-05/09)
+- [ ] Echtdaten erst mit der Bluetooth-Implementierung; bis dahin Test über Shell-Befehl `temp set <burner|core> …` / `temp clear <burner|core> …`
 
 ### WEB-REQ-09
 
-#### Beschreibung
-
-Jede Kerntemperatur-Zelle (c1–c4) soll farblich hervorgehoben werden, sobald für die zugehörige Zone eine Zieltemperatur gesetzt ist. Die Hintergrundfarbe richtet sich nach der Differenz zwischen aktueller Kerntemperatur und Zieltemperatur gemäß folgender Tabelle:
-
-| Bedingung | Hintergrund | Textfarbe |
-|-----------|-------------|-----------|
-| Keine Zieltemperatur gesetzt | Standard (kein Farbeingriff) | Standard |
-| Kerntemperatur < Zieltemperatur − 10 °C | Weiß (`#ffffff`) | Schwarz (`#000000`) |
-| Zieltemperatur − 10 °C ≤ Kerntemperatur < Zieltemperatur − 5 °C | Gelb (`#ffff00`) | Schwarz (`#000000`) |
-| Zieltemperatur − 5 °C ≤ Kerntemperatur ≤ Zieltemperatur + 5 °C | Grün (`#00c800`) | Schwarz (`#000000`) |
-| Kerntemperatur > Zieltemperatur + 5 °C | Hellrot (`#ff6464`) | Schwarz (`#000000`) |
-
-Die Einstufung wird bei jedem eintreffenden SSE-Event neu berechnet. Ist der Kerntemperaturwert ungültig (`ok = 0`), bleibt die Zelle ungefärbt (Standard).
+> **Abgelöst durch DSP-REQ-03/04** (siehe `doc/requirements/display.md`). Die Differenz-basierte Hintergrundfärbung der Kerntemperatur-Zelle entfällt: An ihre Stelle tritt der profilabhängige Farbbalken der Kerntemperatur-Anzeige mit beweglichem Indikator und Garstufen-Legende.
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Mittel    | Umgesetzt | `app/src/webserver.c:k_HtmlScript` (`col()`-Funktion im JavaScript-Client) |
-
-#### Abhängigkeiten
-
-- WEB-REQ-04 (Kerntemperatur-Reihe)
-- WEB-REQ-05 (Zieltemperatur-Reihe)
-- WEB-REQ-07 (clientseitige Aktualisierung via EventSource)
-
-#### Abnahmekriterien
-
-- Ist für eine Zone keine Zieltemperatur gesetzt (`target[i].ok = 0`), bleibt Hintergrund und Textfarbe der zugehörigen Kerntemperatur-Zelle unverändert
-- Ist der Kerntemperaturwert ungültig (`core[i].ok = 0`), wird keine Farbe gesetzt
-- Kerntemperatur < Zieltemperatur − 10 °C → weißer Hintergrund, schwarze Schrift
-- Zieltemperatur − 10 °C ≤ Kerntemperatur < Zieltemperatur − 5 °C → gelber Hintergrund, schwarze Schrift
-- Zieltemperatur − 5 °C ≤ Kerntemperatur ≤ Zieltemperatur + 5 °C → grüner Hintergrund, schwarze Schrift
-- Kerntemperatur > Zieltemperatur + 5 °C → hellroter Hintergrund, schwarze Schrift
-- Die Farbe wird bei jedem SSE-Event aktualisiert (kein Seiten-Reload erforderlich)
-- Die Farblogik ist ausschließlich im JavaScript-Client implementiert; der Server sendet keine CSS-Klassen oder Inline-Styles
+| Mittel    | Abgelöst | — (ersetzt durch DSP-REQ-03/04) |
 
 ---
 
@@ -327,3 +286,4 @@ Die Einstufung wird bei jedem eintreffenden SSE-Event neu berechnet. Ist der Ker
 | 1.7     | 2026-05-29 |       | WEB-REQ-06/07 umgesetzt: SSE-Endpoint `/events` mit Push bei Wertänderung, clientseitige Aktualisierung via `EventSource`; JSON-Format und Ein-Client-Einschränkung dokumentiert |
 | 1.8     | 2026-05-29 |       | WEB-REQ-09 ergänzt: farbliche Hervorhebung der Kerntemperatur-Zellen in Abhängigkeit von der Zieltemperatur |
 | 1.9     | 2026-05-29 |       | WEB-REQ-09 umgesetzt: `col()`-Funktion im JavaScript-Client (`k_HtmlScript`) |
+| 1.10    | 2026-05-29 |       | WEB-REQ-05 und WEB-REQ-09 abgelöst durch DSP-REQ-01..04; SSE-Feld `target` entfernt; WEB-REQ-07 auf `b1`–`b4` / `c1`–`c4` und Implementierungsverweis auf `Html_AppendDisplay()` aktualisiert |

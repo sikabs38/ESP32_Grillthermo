@@ -111,6 +111,17 @@ west build -p always -b esp32s3_devkitc/esp32s3/procpu -d build app
 west flash
 ```
 
+Falls esptool das Gerät nicht findet (Meldung „Could not connect to an Espressif device …") oder versehentlich `/dev/ttyS0` statt `/dev/ttyACM0` probiert, läuft auf dem ESP wahrscheinlich noch die alte Firmware und der ROM-Bootloader ist nicht aktiv. In den Download-Modus kommt man so:
+
+- **Per Shell** (wenn die alte Firmware noch reagiert): in der Shell `bootloader` eingeben und mit der konfigurierten PIN bestätigen — der ESP startet direkt im Download-Modus neu.
+- **Per Hardware**: am DevKitC `BOOT` gedrückt halten, kurz `RESET` drücken, `BOOT` loslassen.
+- **Port explizit angeben**, falls esptool den falschen Port wählt:
+  ```bash
+  west flash --esp-device /dev/ttyACM0
+  ```
+
+Nach erfolgreichem Flash startet der ESP per Hard-Reset automatisch wieder in der normalen Firmware.
+
 ### Shell-Zugriff via USB
 
 Nach dem Flashen erscheint das Gerät als virtueller serieller Port (USB CDC-ACM). Verbindung herstellen mit:

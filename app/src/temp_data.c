@@ -11,7 +11,7 @@ K_CONDVAR_DEFINE(g_TempCondvar);
 uint32_t g_TempGen = 0U;
 
 /* TMP-REQ-01: Globale Temperaturdaten mit Initialisierungswerten.
- * Brenner: 20 °C / valid, Kern und Ziel: 0 °C / ungueltig (→ Anzeige "--"). */
+ * Brenner: 20 °C / valid, Kern: 0 °C / ungueltig (→ Anzeige "--"). */
 Temp_Data_t g_TempData = {
     .burner = {
         { .value = (int16_t)20, .valid = true  },
@@ -20,12 +20,6 @@ Temp_Data_t g_TempData = {
         { .value = (int16_t)20, .valid = true  },
     },
     .core = {
-        { .value = (int16_t)0, .valid = false },
-        { .value = (int16_t)0, .valid = false },
-        { .value = (int16_t)0, .valid = false },
-        { .value = (int16_t)0, .valid = false },
-    },
-    .target = {
         { .value = (int16_t)0, .valid = false },
         { .value = (int16_t)0, .valid = false },
         { .value = (int16_t)0, .valid = false },
@@ -50,9 +44,6 @@ int Temp_Set(uint8_t group, uint8_t zone, int16_t value, bool valid)
         break;
     case TEMP_GROUP_CORE:
         arr = g_TempData.core;
-        break;
-    case TEMP_GROUP_TARGET:
-        arr = g_TempData.target;
         break;
     default:
         (void)k_mutex_unlock(&g_TempMutex);

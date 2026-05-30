@@ -348,4 +348,3 @@ Eine ungültige Eingabe in der Shell darf nicht zum Absturz oder undefinierten V
 | 1.8     | 2026-05-27 |       | SHL-REQ-07 Status auf „Umgesetzt" gesetzt; SHL-REQ-08 überarbeitet: interaktiver `Pin:`-Prompt statt Argument, Status auf „In Bearbeitung" |
 | 1.9     | 2026-05-27 |       | SHL-REQ-02 überarbeitet: Passwort wird interaktiv mit `Passwort:`-Prompt und `*`-Verdeckung abgefragt statt als Argument übergeben |
 | 2.0     | 2026-05-27 |       | SHL-REQ-09 ergänzt: `wifi status`-Befehl zur Anzeige des WiFi-Verbindungsstatus |
-| 2.1     | 2026-05-30 |       | Projektumbenennung „Grill Buddy" → „ESP32 Grillthermo": Shell-Prompt `Grillthermo:`, Bootmeldung-Banner `=== ESP32 Grillthermo ===` (SHL-REQ-06/07) |

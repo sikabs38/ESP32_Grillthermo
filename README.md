@@ -15,6 +15,10 @@ Firmware für die Anzeige der Temperaturen eines Otto Wilde Grills G32. Das Proj
 - Bereitstellung der Daten über MQTT
 - Konfigurationsshell über USB (CDC-ACM)
 
+### Beispiel der Webanzeige
+
+![Webanzeige des ESP32 Grillthermo](doc/webpage_beispiel.png)
+
 ## Entwicklungsumgebung
 
 - **RTOS:** Zephyr OS 4.4

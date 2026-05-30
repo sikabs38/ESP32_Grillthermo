@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 #
-# Bootstrap des west-Workspace fuer GrillBuddy.
+# Bootstrap des west-Workspace fuer ESP32_Grillthermo.
 #
 # Verwendung (nach dem Klonen):
-#   git clone <repo-url> GrillBuddy
-#   GrillBuddy/scripts/west-init.sh
+#   git clone <repo-url> ESP32_Grillthermo
+#   ESP32_Grillthermo/scripts/west-init.sh
 #
 # Das Script legt den west-Workspace im ELTERNverzeichnis des Repos an
 # (Topdir), holt das in west.yml gepinnte Zephyr + die Module und die
 # proprietaeren ESP32-WiFi/BT-Blobs.
 #
 # Anschliessend bauen mit:
-#   cd GrillBuddy
+#   cd ESP32_Grillthermo
 #   west build -b esp32s3_devkitc/esp32s3/procpu -d build app
 
 set -euo pipefail

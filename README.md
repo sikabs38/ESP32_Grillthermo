@@ -1,6 +1,6 @@
-# Grill Buddy
+# ESP32 Grillthermo
 
-Firmware für die Anzeige der Temperaturen eines Otto Wilde Grills G32. Das Projekt ist ein Ersatz für den nicht mehr erhältlichen Original-Grill-Buddy der Firma.
+Firmware für die Anzeige der Temperaturen eines Otto Wilde Grills G32. Das Projekt ist ein Ersatz für den nicht mehr erhältlichen Original-Grill-Buddy von Otto Wilde. Der Projektname wurde bewusst von „Grill Buddy" auf „ESP32 Grillthermo" geändert, um Verwechslungen mit dem Otto-Wilde-Produkt zu vermeiden.
 
 ## Hardware
 
@@ -23,7 +23,7 @@ Firmware für die Anzeige der Temperaturen eines Otto Wilde Grills G32. Das Proj
 ## Dateistruktur
 
 ```
-GrillBuddy/
+ESP32_Grillthermo/
 ├── west.yml                          # West-Manifest, pinnt Zephyr auf festen Commit
 ├── .gitignore
 ├── README.md
@@ -66,8 +66,8 @@ West und das Zephyr SDK müssen installiert sein. Siehe [Zephyr Getting Started 
 Das Repo ist das Manifest-Repo eines eigenen west-Workspace. Zephyr und die Module liegen **neben** dem Repo im Workspace-Topdir (deshalb in `.gitignore`, nicht im Repo selbst):
 
 ```
-grill-buddy-ws/            <- Workspace (Topdir, kein git-Repo)
-├── GrillBuddy/            <- dieses Repo (west-Manifest, self.path)
+esp32-grillthermo-ws/      <- Workspace (Topdir, kein git-Repo)
+├── ESP32_Grillthermo/     <- dieses Repo (west-Manifest, self.path)
 ├── zephyr/                <- in west.yml gepinnte Zephyr-Version
 └── modules/ bootloader/ tools/
 ```
@@ -75,27 +75,27 @@ grill-buddy-ws/            <- Workspace (Topdir, kein git-Repo)
 Einrichtung per Bootstrap-Script:
 
 ```bash
-mkdir grill-buddy-ws && cd grill-buddy-ws
-git clone <repo-url> GrillBuddy
-GrillBuddy/scripts/west-init.sh
+mkdir esp32-grillthermo-ws && cd esp32-grillthermo-ws
+git clone <repo-url> ESP32_Grillthermo
+ESP32_Grillthermo/scripts/west-init.sh
 ```
 
 Das Script führt `west init -l`, `west update` und `west blobs fetch hal_espressif` aus. Alternativ manuell:
 
 ```bash
-mkdir grill-buddy-ws && cd grill-buddy-ws
-git clone <repo-url> GrillBuddy
-west init -l GrillBuddy        # Topdir = grill-buddy-ws
-west update                    # gepinntes Zephyr + Module holen
-west blobs fetch hal_espressif # ESP32-WiFi/BT-Blobs (nicht in west update enthalten)
+mkdir esp32-grillthermo-ws && cd esp32-grillthermo-ws
+git clone <repo-url> ESP32_Grillthermo
+west init -l ESP32_Grillthermo   # Topdir = esp32-grillthermo-ws
+west update                      # gepinntes Zephyr + Module holen
+west blobs fetch hal_espressif   # ESP32-WiFi/BT-Blobs (nicht in west update enthalten)
 ```
 
-> In ein Verzeichnis namens `GrillBuddy` klonen — der Name muss zu `self.path` in `west.yml` passen.
+> In ein Verzeichnis namens `ESP32_Grillthermo` klonen — der Name muss zu `self.path` in `west.yml` passen.
 
 ### Firmware bauen
 
 ```bash
-cd GrillBuddy
+cd ESP32_Grillthermo
 west build -b esp32s3_devkitc/esp32s3/procpu -d build app
 ```
 

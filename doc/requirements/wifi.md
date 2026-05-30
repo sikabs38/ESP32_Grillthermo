@@ -2,7 +2,7 @@
 
 ## 1. Übersicht
 
-Das WiFi-Modul verwaltet die WLAN-Verbindung des Grill Buddy. Es lädt beim Start die gespeicherte Konfiguration, baut bei gültiger SSID automatisch eine Verbindung auf und läuft in einem dedizierten Thread. Statusmeldungen informieren über Verbindungsauf- und -abbau. Eine neue Konfiguration aus der Shell löst sofort einen neuen Verbindungsversuch aus.
+Das WiFi-Modul verwaltet die WLAN-Verbindung des ESP32 Grillthermo. Es lädt beim Start die gespeicherte Konfiguration, baut bei gültiger SSID automatisch eine Verbindung auf und läuft in einem dedizierten Thread. Statusmeldungen informieren über Verbindungsauf- und -abbau. Eine neue Konfiguration aus der Shell löst sofort einen neuen Verbindungsversuch aus.
 
 ---
 

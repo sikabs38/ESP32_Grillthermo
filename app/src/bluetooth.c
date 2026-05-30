@@ -30,17 +30,19 @@ LOG_MODULE_REGISTER(bluetooth_app, LOG_LEVEL_INF);
 #define BT_RECONNECT_INTERVAL_MS  (10000U)
 
 /* BLE-REQ-04..06: Mindest-Payload-Groesse, ab der wir parsen
- * (Header bis inkl. Gas-%-Byte). Kleinere Pakete werden verworfen. */
-#define BT_NOTIFY_MIN_LEN         (26U)
+ * (mindestens bis Ende Gas-Gewicht-Bytes). Kleinere Pakete werden verworfen.
+ * Gas-Prozent (Index 31) wird nur ausgewertet, falls das Paket lang genug ist. */
+#define BT_NOTIFY_MIN_LEN         (24U)
 
-/* Reverse-Engineering-Stand (bluetooth.md Abschnitt 2.2):
- * BLE-Offsets sind aus dem TCP-Layout abgeleitet (TCP minus 6 Byte Header).
- * Vor Inbetriebnahme mit nRF Connect verifizieren! */
-#define BT_OFF_BURNER             (0U)   /* 4 Brenner, je 2 B = 8 B */
-#define BT_OFF_CORE               (8U)   /* 4 Sonden, je 2 B = 8 B */
-#define BT_OFF_GAS_GRAMS_HI       (16U)
-#define BT_OFF_GAS_GRAMS_LO       (17U)
-#define BT_OFF_GAS_PERCENT        (25U)
+/* EXPERIMENTAL (Sniff-Auswertung 2026-05-30): das BLE-Notify nutzt das
+ * gleiche Layout wie das Cloud-TCP-Frame inkl. 6 B Header (a33a + meta).
+ * Offsets werden aus bluetooth.md Abschnitt 2.2, Spalte "Byte (TCP)" uebernommen.
+ * Falls sich die Annahme bestaetigt, in der Anforderung dokumentieren. */
+#define BT_OFF_BURNER             (6U)   /* 4 Brenner, je 2 B (off 6..13) */
+#define BT_OFF_CORE               (14U)  /* 4 Sonden, je 2 B (off 14..21) */
+#define BT_OFF_GAS_GRAMS_HI       (22U)
+#define BT_OFF_GAS_GRAMS_LO       (23U)
+#define BT_OFF_GAS_PERCENT        (31U)
 
 /* BLE-REQ-04/05: Sentinel-Wert fuer nicht angeschlossene Sonde (Abschnitt 2.3) */
 #define BT_TEMP_SENTINEL          (1500)
@@ -90,6 +92,9 @@ static ScanSeen_t g_ScanSeen[BT_SCAN_MAX_RESULTS];
 static size_t     g_ScanSeenCount = 0U;
 
 static bool g_BtReady = false;
+
+/* Diagnose: bei true wird jedes Notify als Hex-Dump + Decodierung ausgegeben */
+static volatile bool g_SniffActive = false;
 
 /* ------------------------------------------------------------------ */
 /* Hilfsfunktionen                                                     */
@@ -146,11 +151,99 @@ static void Bt_ScanSeenAdd(const bt_addr_le_t *addr)
 }
 
 /* ------------------------------------------------------------------ */
+/* Diagnose: Hex-Dump + Decodierung der Notify-Payload                 */
+/* ------------------------------------------------------------------ */
+
+static void Bt_SniffDumpZoneGroup(const char *label, uint16_t baseOff,
+                                  const uint8_t *data, uint16_t length)
+{
+    uint8_t i;
+
+    printk(" %s (off %u..%u):", label,
+           (unsigned int)baseOff,
+           (unsigned int)(baseOff + (TEMP_ZONE_COUNT * 2U) - 1U));
+
+    for (i = 0U; i < (uint8_t)TEMP_ZONE_COUNT; i++) {
+        uint16_t hiOff = baseOff + ((uint16_t)i * 2U);
+        uint16_t loOff = hiOff + 1U;
+
+        if (loOff >= length) {
+            printk("  z%u[--]", (unsigned int)i);
+            continue;
+        }
+
+        uint8_t hi   = data[hiOff];
+        uint8_t lo   = data[loOff];
+        int16_t v    = Bt_DecodeTemp(hi, lo);
+        const char *sent = Bt_IsTempSentinel(v) ? " SENT" : "";
+
+        printk("  z%u[%02u,%02u]=%02X:%02X->%d C%s",
+               (unsigned int)i,
+               (unsigned int)hiOff, (unsigned int)loOff,
+               (unsigned int)hi, (unsigned int)lo,
+               (int)v, sent);
+    }
+    printk("\n");
+}
+
+static void Bt_SniffDump(const uint8_t *data, uint16_t length)
+{
+    uint16_t i;
+
+    printk("BT-Sniff len=%u\n", (unsigned int)length);
+
+    /* Hex-Dump: 16 Byte pro Zeile, zwei Halbgruppen mit Trennzeichen */
+    printk(" hex:");
+    for (i = 0U; i < length; i++) {
+        if ((i > 0U) && ((i % 16U) == 0U)) {
+            printk("\n     ");
+        } else if ((i > 0U) && ((i % 8U) == 0U)) {
+            printk(" ");
+        } else {
+            /* kein extra Trenner */
+        }
+        printk(" %02X", (unsigned int)data[i]);
+    }
+    printk("\n");
+
+    /* Aktuelle Belegung gemaess BT_OFF_*-Konstanten */
+    Bt_SniffDumpZoneGroup("BURNER", (uint16_t)BT_OFF_BURNER, data, length);
+    Bt_SniffDumpZoneGroup("CORE  ", (uint16_t)BT_OFF_CORE,   data, length);
+
+    if ((uint16_t)BT_OFF_GAS_GRAMS_LO < length) {
+        uint16_t grams = (uint16_t)(((uint16_t)data[BT_OFF_GAS_GRAMS_HI] << 8) |
+                                    (uint16_t)data[BT_OFF_GAS_GRAMS_LO]);
+        printk(" GAS   grams[%u,%u]=%02X:%02X=%u g",
+               (unsigned int)BT_OFF_GAS_GRAMS_HI,
+               (unsigned int)BT_OFF_GAS_GRAMS_LO,
+               (unsigned int)data[BT_OFF_GAS_GRAMS_HI],
+               (unsigned int)data[BT_OFF_GAS_GRAMS_LO],
+               (unsigned int)grams);
+    } else {
+        printk(" GAS   grams[--]");
+    }
+    if ((uint16_t)BT_OFF_GAS_PERCENT < length) {
+        printk("  percent[%u]=%02X=%u %%\n",
+               (unsigned int)BT_OFF_GAS_PERCENT,
+               (unsigned int)data[BT_OFF_GAS_PERCENT],
+               (unsigned int)data[BT_OFF_GAS_PERCENT]);
+    } else {
+        printk("  percent[--]\n");
+    }
+}
+
+/* ------------------------------------------------------------------ */
 /* Notify-Parser                                          BLE-REQ-04..06 */
 /* ------------------------------------------------------------------ */
 
 static void Bt_ParseAndDispatch(const uint8_t *data, uint16_t length)
 {
+    /* Diagnose: bei aktivem Sniff jede Payload ausgeben — auch zu kurze,
+     * damit man im Debug sieht, wie viel ankommt. */
+    if (g_SniffActive) {
+        Bt_SniffDump(data, length);
+    }
+
     uint8_t  i;
     int16_t  burner[TEMP_ZONE_COUNT];
     int16_t  core[TEMP_ZONE_COUNT];
@@ -180,7 +273,12 @@ static void Bt_ParseAndDispatch(const uint8_t *data, uint16_t length)
     /* BLE-REQ-06: Gas */
     gasGrams   = (uint16_t)(((uint16_t)data[BT_OFF_GAS_GRAMS_HI] << 8) |
                             (uint16_t)data[BT_OFF_GAS_GRAMS_LO]);
-    gasPercent = (int16_t)data[BT_OFF_GAS_PERCENT];
+    /* Percent-Byte liegt erst hinter dem Gas-Gewicht; bei kurzen Paketen fehlt es. */
+    if ((uint16_t)BT_OFF_GAS_PERCENT < length) {
+        gasPercent = (int16_t)data[BT_OFF_GAS_PERCENT];
+    } else {
+        gasPercent = -1; /* Sentinel: nicht im Paket enthalten */
+    }
 
     /* BLE-REQ-04: Brennerwerte ablegen */
     for (i = 0U; i < (uint8_t)TEMP_ZONE_COUNT; i++) {
@@ -204,15 +302,18 @@ static void Bt_ParseAndDispatch(const uint8_t *data, uint16_t length)
         }
     }
 
-    /* BLE-REQ-06: Gas-Plausibilisierung — Prozent 0 + Gewicht 0 → kein Sensor */
-    gasValid = !((gasPercent == 0) && (gasGrams == 0U));
+    /* BLE-REQ-06: Gas-Plausibilisierung
+     *  - Percent-Byte nicht im Paket (gasPercent == -1) → ungueltig
+     *  - Sensor nicht angeschlossen (Percent=0 UND Grams=0) → ungueltig
+     *  - sonst: Wert auf 0..100 begrenzen */
+    if (gasPercent < 0) {
+        gasValid = false;
+    } else {
+        gasValid = !((gasPercent == 0) && (gasGrams == 0U));
+    }
     if (gasValid) {
-        if (gasPercent < 0) {
-            gasPercent = 0;
-        } else if (gasPercent > 100) {
+        if (gasPercent > 100) {
             gasPercent = 100;
-        } else {
-            /* Wert innerhalb 0..100 — keine Begrenzung */
         }
         (void)Temp_SetGas(gasPercent, true);
     } else {
@@ -674,4 +775,14 @@ void Bluetooth_GetStatus(Bluetooth_Status_t *status)
                   CFG_GRILL_MAC_STR_LEN);
     status->peerMac[CFG_GRILL_MAC_STR_LEN] = '\0';
     (void)k_mutex_unlock(&g_StateMutex);
+}
+
+void Bluetooth_SetSniff(bool enable)
+{
+    g_SniffActive = enable;
+}
+
+bool Bluetooth_GetSniff(void)
+{
+    return g_SniffActive;
 }

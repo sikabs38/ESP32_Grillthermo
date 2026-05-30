@@ -33,4 +33,10 @@ int Bluetooth_Disconnect(void);
 /* BLE-REQ-10: Aktuellen Status abfragen. */
 void Bluetooth_GetStatus(Bluetooth_Status_t *status);
 
+/* Diagnose: Sniff-Modus ein-/ausschalten. Bei aktivem Sniff wird jede
+ * empfangene Notify-Payload als Hex-Dump plus aktuell decodierter Belegung
+ * (Brenner/Kern/Gas mit Byte-Offsets) auf die Konsole geschrieben. */
+void Bluetooth_SetSniff(bool enable);
+bool Bluetooth_GetSniff(void);
+
 #endif /* APP_BLUETOOTH_H */

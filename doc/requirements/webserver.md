@@ -2,7 +2,7 @@
 
 ## 1. Übersicht
 
-Der Webserver stellt eine HTTP-Schnittstelle bereit, über die der Grill Buddy im lokalen Netzwerk erreichbar ist. Die Startseite zeigt den Gerätenamen sowie die aktuellen Grill-Messwerte (Brenner und Thermometer) in einem Browser an, ohne dass zusätzliche Software installiert werden muss.
+Der Webserver stellt eine HTTP-Schnittstelle bereit, über die das ESP32 Grillthermo im lokalen Netzwerk erreichbar ist. Die Startseite zeigt den Gerätenamen sowie die aktuellen Grill-Messwerte (Brenner und Thermometer) in einem Browser an, ohne dass zusätzliche Software installiert werden muss.
 
 ---
 

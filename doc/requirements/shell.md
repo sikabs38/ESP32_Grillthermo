@@ -129,7 +129,7 @@ Die Shell soll eine Hilfeübersicht aller verfügbaren Befehle bereitstellen.
 
 #### Beschreibung
 
-Der Zugang zur Shell soll durch eine PIN abgesichert sein. Nach dem Verbindungsaufbau erscheint der Prompt `login:` und das System wartet ausschließlich auf die PIN-Eingabe — ohne Befehlsschlüsselwort. Jedes eingegebene Zeichen wird als `*` angezeigt. Bei korrekter PIN wechselt der Prompt zu `Grillbuddy:` und alle Befehle stehen zur Verfügung. Der Initialisierungswert der PIN lautet `000000`. Solange die PIN nicht geändert wurde, soll bei jedem Login ein Hinweis erscheinen, die PIN zu ändern. Die PIN besteht ausschließlich aus Ziffern und hat eine Länge von 4 bis 6 Stellen.
+Der Zugang zur Shell soll durch eine PIN abgesichert sein. Nach dem Verbindungsaufbau erscheint der Prompt `login:` und das System wartet ausschließlich auf die PIN-Eingabe — ohne Befehlsschlüsselwort. Jedes eingegebene Zeichen wird als `*` angezeigt. Bei korrekter PIN wechselt der Prompt zu `Grillthermo:` und alle Befehle stehen zur Verfügung. Der Initialisierungswert der PIN lautet `000000`. Solange die PIN nicht geändert wurde, soll bei jedem Login ein Hinweis erscheinen, die PIN zu ändern. Die PIN besteht ausschließlich aus Ziffern und hat eine Länge von 4 bis 6 Stellen.
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
@@ -145,7 +145,7 @@ Der Zugang zur Shell soll durch eine PIN abgesichert sein. Nach dem Verbindungsa
 - Nach dem Verbindungsaufbau erscheint der Prompt `login:` und erwartet ausschließlich die PIN (kein Befehl)
 - Jedes eingegebene Zeichen der PIN wird als `*` angezeigt (kein Klartext-Echo)
 - Korrekturtaste (Backspace/DEL) löscht das zuletzt eingegebene Zeichen und das zugehörige `*`
-- Bei korrekter PIN wechselt der Prompt zu `Grillbuddy:` und alle Befehle sind verfügbar
+- Bei korrekter PIN wechselt der Prompt zu `Grillthermo:` und alle Befehle sind verfügbar
 - Bei falscher PIN wird eine Fehlermeldung ausgegeben und der `login:`-Prompt erneut angezeigt
 - Solange die PIN dem Initialisierungswert `000000` entspricht, erscheint nach dem Login der Hinweis: `Warnung: Standard-PIN aktiv. Bitte mit "config pin 000000 <neue-pin>" ändern.`
 - Der Befehl `logout` setzt den Prompt auf `login:` zurück und erfordert erneute PIN-Eingabe
@@ -168,7 +168,7 @@ Die Meldung enthält einen ASCII-Rahmen mit Produktname und -bezeichnung sowie d
 
 ```
 =========================
-===    Grill Buddy    ===
+=== ESP32 Grillthermo ===
 === Temperaturmonitor ===
 =========================
 Zephyr OS: <Version>
@@ -340,7 +340,7 @@ Eine ungültige Eingabe in der Shell darf nicht zum Absturz oder undefinierten V
 | 1.0     | 2026-05-26 |       | Erstellt |
 | 1.1     | 2026-05-26 |       | SHL-REQ-04 präzisiert: Passwortausgabe und Echo unterdrückt |
 | 1.2     | 2026-05-26 |       | SHL-REQ-06 ergänzt: PIN-Schutz für Shell-Zugang |
-| 1.3     | 2026-05-27 |       | SHL-REQ-06 überarbeitet: Bypass-Login mit `login:`-Prompt und `Grillbuddy:`-Prompt nach Anmeldung |
+| 1.3     | 2026-05-27 |       | SHL-REQ-06 überarbeitet: Bypass-Login mit `login:`-Prompt und `Grillthermo:`-Prompt nach Anmeldung |
 | 1.4     | 2026-05-27 |       | SHL-REQ-07 ergänzt: Bootmeldung mit ASCII-Rahmen und Systeminformationen |
 | 1.5     | 2026-05-27 |       | Skill-Alignment: SHL-REQ-04 Status „Offen" → „Umgesetzt", MISRA C → MISRA C 2023 |
 | 1.6     | 2026-05-27 |       | SHL-REQ-07 erweitert: Bootmeldung bei Verbindungsaufbau (DTR) und nach Logout |
@@ -348,3 +348,4 @@ Eine ungültige Eingabe in der Shell darf nicht zum Absturz oder undefinierten V
 | 1.8     | 2026-05-27 |       | SHL-REQ-07 Status auf „Umgesetzt" gesetzt; SHL-REQ-08 überarbeitet: interaktiver `Pin:`-Prompt statt Argument, Status auf „In Bearbeitung" |
 | 1.9     | 2026-05-27 |       | SHL-REQ-02 überarbeitet: Passwort wird interaktiv mit `Passwort:`-Prompt und `*`-Verdeckung abgefragt statt als Argument übergeben |
 | 2.0     | 2026-05-27 |       | SHL-REQ-09 ergänzt: `wifi status`-Befehl zur Anzeige des WiFi-Verbindungsstatus |
+| 2.1     | 2026-05-30 |       | Projektumbenennung „Grill Buddy" → „ESP32 Grillthermo": Shell-Prompt `Grillthermo:`, Bootmeldung-Banner `=== ESP32 Grillthermo ===` (SHL-REQ-06/07) |

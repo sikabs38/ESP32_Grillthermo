@@ -2,7 +2,7 @@
 
 ## 1. Übersicht
 
-Das Bluetooth-Modul verbindet den Grill Buddy mit dem Otto Wilde G32 Gasgrill über Bluetooth Low Energy (BLE). Der ESP32-S3 arbeitet als BLE-Central und verbindet sich mit dem Grill, der als Peripheral seine Messwerte über eine GATT-Notification-Charakteristik bereitstellt.
+Das Bluetooth-Modul verbindet das ESP32 Grillthermo mit dem Otto Wilde G32 Gasgrill über Bluetooth Low Energy (BLE). Der ESP32-S3 arbeitet als BLE-Central und verbindet sich mit dem Grill, der als Peripheral seine Messwerte über eine GATT-Notification-Charakteristik bereitstellt.
 
 Aus dem Grill werden ausgelesen:
 
@@ -29,7 +29,7 @@ Otto Wilde dokumentiert das BLE-Protokoll des G32 nicht offiziell. Die folgenden
 | Charakteristik TX (Notify)         | `dc0f41e2-b6ae-46a8-a19e-1a3bf4342bcb`     |
 | Charakteristik RX (optional)       | `dc0f41e1-b6ae-46a8-a19e-1a3bf4342bcb`     |
 | Notify-Payload                     | 28 Byte Nutzdaten + 3 Byte ATT-Overhead    |
-| Max. parallele BLE-Clients am Grill| 3 (Otto-Wilde-App, Grill Buddy, weitere)   |
+| Max. parallele BLE-Clients am Grill| 3 (Otto-Wilde-App, ESP32 Grillthermo, weitere) |
 | SMP-Pairing                        | nicht erforderlich (offene GATT-Charakteristik) |
 
 ### 2.2 Byte-Layout der Notify-Payload
@@ -59,7 +59,7 @@ Hinweis: Die Indizes stammen aus der Cloud-TCP-Variante des Protokolls (51 Byte 
 ### 2.4 Kopplungs-/Verbindungsverhalten
 
 - Der G32 erfordert kein SMP-Pairing; ein Connect plus Subscribe auf die Notify-Charakteristik genügt.
-- Der Grill akzeptiert bis zu drei parallele GATT-Verbindungen. Eine zusätzliche Verbindung durch den Grill Buddy stört die Otto-Wilde-App nicht.
+- Der Grill akzeptiert bis zu drei parallele GATT-Verbindungen. Eine zusätzliche Verbindung durch das ESP32 Grillthermo stört die Otto-Wilde-App nicht.
 - Auswahl des Grills erfolgt anhand des Advertising-Namens `OWG-G32C` oder per Service-UUID-Filter.
 
 ---

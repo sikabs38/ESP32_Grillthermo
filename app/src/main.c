@@ -6,11 +6,11 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_REGISTER(grill_buddy, LOG_LEVEL_ERR);
+LOG_MODULE_REGISTER(esp32_grillthermo, LOG_LEVEL_ERR);
 
 int main(void)
 {
-    LOG_INF("Grill Buddy gestartet.");
+    LOG_INF("ESP32 Grillthermo gestartet.");
     Webserver_Start();
     return 0;
 }

@@ -129,7 +129,7 @@ static void Shell_PrintBanner(void)
 {
     printk("\n"
            "=========================\n"
-           "===    Grill Buddy    ===\n"
+           "=== ESP32 Grillthermo ===\n"
            "=== Temperaturmonitor ===\n"
            "=========================\n"
            "Zephyr OS: " KERNEL_VERSION_STRING "\n"
@@ -145,7 +145,7 @@ static void Shell_PrintBannerShell(const struct shell *sh)
     shell_fprintf(sh, SHELL_NORMAL,
                   "\n"
                   "=========================\n"
-                  "===    Grill Buddy    ===\n"
+                  "=== ESP32 Grillthermo ===\n"
                   "=== Temperaturmonitor ===\n"
                   "=========================\n"
                   "Zephyr OS: " KERNEL_VERSION_STRING "\n"
@@ -207,7 +207,7 @@ static void Shell_LoginBypass(const struct shell *sh, uint8_t *data,
                 g_Authenticated = true;
                 g_PinBufLen     = 0U;
                 (void)shell_obscure_set(sh, false);
-                (void)shell_prompt_change(sh, "Grillbuddy: ");
+                (void)shell_prompt_change(sh, "Grillthermo: ");
                 shell_set_bypass(sh, NULL, NULL);
                 shell_print(sh, "Anmeldung erfolgreich.");
                 if (Shell_PinIsDefault()) {
@@ -472,7 +472,7 @@ static int Shell_CmdConfigShow(const struct shell *sh, size_t argc, char **argv)
         return -EACCES;
     }
 
-    shell_print(sh, "--- Grill Buddy Konfiguration ---");
+    shell_print(sh, "--- ESP32 Grillthermo Konfiguration ---");
     shell_print(sh, "WiFi SSID    : %s",
                 (g_Config.wifiSsid[0] != '\0') ? g_Config.wifiSsid : "[nicht gesetzt]");
     /* SHL-REQ-05, CFG-REQ-05: Passwort nie im Klartext ausgeben */
@@ -1095,6 +1095,32 @@ static int Shell_CmdBtStatus(const struct shell *sh, size_t argc, char **argv)
     return 0;
 }
 
+/* Diagnose: bt sniff on|off — Notify-Payloads als Hex-Dump + Decodierung */
+static int Shell_CmdBtSniff(const struct shell *sh, size_t argc, char **argv)
+{
+    if (!Shell_CheckAuth(sh)) {
+        return -EACCES;
+    }
+
+    if (argc < 2) {
+        shell_print(sh, "Sniff ist %s.", Bluetooth_GetSniff() ? "an" : "aus");
+        shell_print(sh, "Verwendung: bt sniff <on|off>");
+        return 0;
+    }
+
+    if (strcmp(argv[1], "on") == 0) {
+        Bluetooth_SetSniff(true);
+        shell_print(sh, "Sniff aktiviert. Vorsicht: kann die Konsole fluten.");
+    } else if (strcmp(argv[1], "off") == 0) {
+        Bluetooth_SetSniff(false);
+        shell_print(sh, "Sniff deaktiviert.");
+    } else {
+        shell_error(sh, "Verwendung: bt sniff <on|off>");
+        return -EINVAL;
+    }
+    return 0;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_bt,
     SHELL_CMD_ARG(scan,   NULL,
                   "Geraete-Scan: [all] alle, [stop] beenden, sonst nur G32",
@@ -1108,6 +1134,9 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_bt,
     SHELL_CMD(    status, NULL,
                   "Bluetooth-Status anzeigen",
                   Shell_CmdBtStatus),
+    SHELL_CMD_ARG(sniff,  NULL,
+                  "Notify-Payloads als Hex-Dump + aktuelle Decodierung: <on|off>",
+                  Shell_CmdBtSniff,  1, 1),
     SHELL_SUBCMD_SET_END
 );
 

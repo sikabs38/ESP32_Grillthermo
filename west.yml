@@ -1,6 +1,6 @@
 manifest:
   self:
-    path: GrillBuddy
+    path: ESP32_Grillthermo
   projects:
     - name: zephyr
       url: https://github.com/zephyrproject-rtos/zephyr

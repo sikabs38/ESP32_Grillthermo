@@ -1,8 +1,8 @@
-# ESP32 Grill Buddy
+# ESP32 Grillthermo
 
 # Beschreibung
 
-Das Projekt ist eine Firmware für die Anzeige der Temperaturen von einem Otto Wilde Grill G32. Sie ist analog zu dem nicht mehr erhältlichen Grill Buddy der Firma.
+Das Projekt ist eine Firmware für die Anzeige der Temperaturen von einem Otto Wilde Grill G32. Sie ist analog zu dem nicht mehr erhältlichen „Grill Buddy" der Firma (dessen Produktname hier nur als Referenz dient — eigener Projektname ist „ESP32 Grillthermo", um Verwechslungen mit dem Otto-Wilde-Produkt zu vermeiden).
 
 # Hardware
 

@@ -575,10 +575,10 @@ static struct http_resource_detail_dynamic g_EventsDetail = {
 };
 
 /* WEB-REQ-08: maximal 3 gleichzeitige Clients, Backlog 3 fuer wartende Verbindungen */
-HTTP_SERVICE_DEFINE(grill_buddy_svc, NULL, &g_HttpPort, 3, 3, NULL, NULL, NULL);
-HTTP_RESOURCE_DEFINE(index_resource, grill_buddy_svc, "/", &g_IndexDetail);
+HTTP_SERVICE_DEFINE(esp32_grillthermo_svc, NULL, &g_HttpPort, 3, 3, NULL, NULL, NULL);
+HTTP_RESOURCE_DEFINE(index_resource, esp32_grillthermo_svc, "/", &g_IndexDetail);
 /* WEB-REQ-06: SSE-Endpoint */
-HTTP_RESOURCE_DEFINE(events_resource, grill_buddy_svc, "/events", &g_EventsDetail);
+HTTP_RESOURCE_DEFINE(events_resource, esp32_grillthermo_svc, "/events", &g_EventsDetail);
 
 /* ------------------------------------------------------------------ */
 /* Oeffentliche API                                       WEB-REQ-01   */

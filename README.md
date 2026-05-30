@@ -12,7 +12,7 @@ Firmware für die Anzeige der Temperaturen eines Otto Wilde Grills G32. Das Proj
 - Bluetooth-Kommunikation mit dem Grill
 - Anzeige von 4 Brennerbereichen und 4 Thermometern
 - Bereitstellung der Daten über einen Webserver
-- Bereitstellung der Daten über MQTT
+- Bereitstellung der Daten über MQTT *(geplant — noch nicht implementiert)*
 - Konfigurationsshell über USB (CDC-ACM)
 
 ### Beispiel der Webanzeige

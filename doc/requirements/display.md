@@ -2,7 +2,7 @@
 
 ## 1. Übersicht
 
-Die Webanzeige stellt vier Temperaturblöcke dar — einen pro Grillzone. Jeder Block besteht aus zwei nebeneinander angeordneten Anzeigefeldern: Garraumtemperatur und Kerntemperatur des Grillguts. Beide Felder sind identisch aufgebaut und folgen demselben visuellen Schema. Unterhalb der vier Blöcke wird der Gasflaschen-Füllstand zentriert dargestellt (DSP-REQ-06).
+Die Webanzeige stellt vier Temperaturblöcke dar — einen pro Grillzone. Jeder Block besteht aus zwei nebeneinander angeordneten Anzeigefeldern: Garraumtemperatur und Kerntemperatur des Grillguts. Beide Felder sind identisch aufgebaut und folgen demselben visuellen Schema. Das Grillgut-Profil ist pro Zone unabhängig einstellbar (DSP-REQ-07), sodass z. B. in Zone 1 Rind und in Zone 2 Geflügel gleichzeitig überwacht werden können. Unterhalb der vier Blöcke wird der Gasflaschen-Füllstand zentriert dargestellt (DSP-REQ-06).
 
 Grundlage: `doc/G32_Anzeige_Beschreibung.docx`, Version 1.0 vom 29. Mai 2026.
 
@@ -98,7 +98,7 @@ Jede Garraumtemperatur-Anzeige zeigt die aktuelle Temperatur im Innenraum des G3
 
 #### Beschreibung
 
-Jede Kerntemperatur-Anzeige zeigt die Innentemperatur des Grillguts in der jeweiligen Zone. Wertebereich und Farbzonen sind abhängig vom gewählten Grillgut-Profil (siehe DSP-REQ-04).
+Jede Kerntemperatur-Anzeige zeigt die Innentemperatur des Grillguts in der jeweiligen Zone. Wertebereich und Farbzonen sind abhängig vom für diese Zone gewählten Grillgut-Profil (siehe DSP-REQ-04 für den Profil-Katalog und DSP-REQ-07 für die zonenweise Auswahl).
 
 **Anzeigeelemente:**
 
@@ -115,23 +115,24 @@ Jede Kerntemperatur-Anzeige zeigt die Innentemperatur des Grillguts in der jewei
 #### Abhängigkeiten
 
 - DSP-REQ-01 (Vier Temperaturblöcke)
-- DSP-REQ-04 (Grillgut-Profile)
+- DSP-REQ-04 (Grillgut-Profile als Datenkatalog)
+- DSP-REQ-07 (zonenweise Profilauswahl)
 - TMP-REQ-01 (`core[i]`-Werte)
 
 #### Abnahmekriterien
 
 - Numerischer Wert wird als gerundete Ganzzahl in °C dargestellt
-- Farbbalken bildet den Min..Max-Bereich des aktiven Profils ab
-- Garstufenname entspricht der zum aktuellen Wert gehörenden Stufe des aktiven Profils
-- Legende zeigt alle Garstufen des aktiven Profils mit deren Farben
+- Farbbalken bildet den Min..Max-Bereich des für diese Zone gewählten Profils ab
+- Garstufenname entspricht der zum aktuellen Wert gehörenden Stufe des für diese Zone gewählten Profils
+- Legende zeigt alle Garstufen des für diese Zone gewählten Profils mit deren Farben
 
 ---
 
-### DSP-REQ-04 — Grillgut-Profile
+### DSP-REQ-04 — Grillgut-Profile (Katalog)
 
 #### Beschreibung
 
-Das aktive Grillgut-Profil wird über eine Auswahl-Leiste (Chips) oberhalb der Anzeigen gesetzt. Es kann jederzeit gewechselt werden; die Skala der Kerntemperatur-Anzeigen passt sich sofort an.
+Das System stellt vier Grillgut-Profile als Datenkatalog bereit. Jedes Profil definiert seinen Wertebereich (Min..Max) sowie eine Liste von Garstufen mit zugehörigen Temperaturgrenzen und Farben für die Darstellung in der Kerntemperatur-Anzeige (DSP-REQ-03). Die Auswahl, welches Profil in welcher Zone aktiv ist, regelt DSP-REQ-07.
 
 **Rind (Steak):**
 
@@ -167,7 +168,7 @@ Das aktive Grillgut-Profil wird über eine Auswahl-Leiste (Chips) oberhalb der A
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch | Umgesetzt | `app/src/webserver.c`: `k_HtmlProfiles` (Chips); JS-Objekt `PR` mit `rind`/`schwein`/`gefluegel`/`fisch`; `setPr()` aktualisiert Skala und Legende, `cp`-Default = `'rind'` |
+| Hoch | Umgesetzt | `app/src/webserver.c`: JS-Objekt `PR` mit `rind`/`schwein`/`gefluegel`/`fisch` (Datenkatalog). Die globale Chip-Leiste `k_HtmlProfiles` und `setPr()` für eine zonenübergreifende Auswahl entfallen mit der Umsetzung von DSP-REQ-07. |
 
 #### Abhängigkeiten
 
@@ -175,9 +176,9 @@ Das aktive Grillgut-Profil wird über eine Auswahl-Leiste (Chips) oberhalb der A
 
 #### Abnahmekriterien
 
-- Auswahl-Leiste enthält die vier Profile Rind, Schwein, Geflügel, Fisch
-- Wechsel des Profils aktualisiert sofort die Skala der Kerntemperatur-Anzeigen
-- Garstufengrenzen und Farben entsprechen den obigen Tabellen
+- Es existieren genau die vier Profile Rind, Schwein, Geflügel und Fisch mit den oben tabellierten Garstufen, Temperaturgrenzen und Farben
+- Die Profil-Daten sind im Frontend als unveränderlicher Datenkatalog verfügbar (z. B. als JavaScript-Konstante), getrennt von der Auswahl-Logik (DSP-REQ-07)
+- Garstufengrenzen und Farben entsprechen exakt den obigen Tabellen
 
 ---
 
@@ -185,7 +186,7 @@ Das aktive Grillgut-Profil wird über eine Auswahl-Leiste (Chips) oberhalb der A
 
 #### Beschreibung
 
-Bei Kerntemperaturwerten außerhalb des Profilbereichs verhält sich die Anzeige wie folgt:
+Bei Kerntemperaturwerten außerhalb des Bereichs des für die jeweilige Zone gewählten Profils (DSP-REQ-07) verhält sich die Anzeige wie folgt:
 
 - Werte unterhalb des Profilminimums: Indikator steht am linken Anschlag, kein Zonenname.
 - Werte oberhalb des Profilmaximums: Indikator steht am rechten Anschlag, letzte Garstufe wird angezeigt.
@@ -197,7 +198,8 @@ Bei Kerntemperaturwerten außerhalb des Profilbereichs verhält sich die Anzeige
 #### Abhängigkeiten
 
 - DSP-REQ-03 (Kerntemperatur-Anzeige)
-- DSP-REQ-04 (Grillgut-Profile)
+- DSP-REQ-04 (Grillgut-Profile als Datenkatalog)
+- DSP-REQ-07 (zonenweise Profilauswahl)
 
 #### Abnahmekriterien
 
@@ -254,6 +256,40 @@ Bei `valid = false` wird `--` angezeigt (z. B. wenn noch kein Sensorwert vorlieg
 
 ---
 
+### DSP-REQ-07 — Zonenspezifische Profilauswahl
+
+#### Beschreibung
+
+Die Auswahl des Grillgut-Profils für die Kerntemperatur-Anzeige soll für jede der vier Zonen unabhängig erfolgen. Damit lassen sich gleichzeitig unterschiedliche Grillgüter überwachen — z. B. Zone 1 „Rind", Zone 2 „Schwein", Zone 3 „Geflügel", Zone 4 „Fisch".
+
+Die Auswahl erfolgt durch ein kompaktes Bedienelement direkt im jeweiligen Zonenblock (z. B. eine kleine Chip-Leiste oder ein Auswahl-Dropdown). Wechselt der Nutzer das Profil einer Zone, aktualisieren sich Skala, Garstufen-Legende, Indikatorposition und Garstufen-Text **nur dieser einen Zone** sofort; die übrigen drei Zonen bleiben unverändert.
+
+Die getroffene Auswahl wird im Browser persistiert (HTML5 `localStorage`), sodass sie nach einem Reload oder einem späteren Aufruf von einem anderen Tab desselben Browsers weiterhin aktiv ist. Bei erstem Aufruf — also wenn für einen Schlüssel kein gespeicherter Wert vorliegt — wird die betreffende Zone auf das Standardprofil „Rind" gesetzt. Die Persistenz ist bewusst rein client-seitig; es findet keine server-seitige Speicherung in `Config_Data_t` und kein Sync zwischen verschiedenen Browsern statt.
+
+Mit der Umsetzung dieser Anforderung entfällt die ursprünglich in DSP-REQ-04 beschriebene globale Chip-Leiste oberhalb der Blöcke.
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Hoch      | Umgesetzt | `app/src/webserver.c`: Fragmente `k_ZoneProfA`/`k_ZoneProfB` und `k_DsClose` (Per-Zone-Chip-Bar pro Block); JS `cp[4]`, `applyPr(z,n)` (rein visuell), `setPr(z,n)` (mit `localStorage.setItem('gt_profile_z'+z, …)`), Init-Loop liest `localStorage` mit Default `'rind'`, Per-Chip-Click via `closest('.pr').dataset.z`; SSE wendet `PR[cp[i]]` pro Zone an |
+
+#### Abhängigkeiten
+
+- DSP-REQ-01 (Vier Temperaturblöcke)
+- DSP-REQ-03 (Kerntemperatur-Anzeige)
+- DSP-REQ-04 (Grillgut-Profile als Datenkatalog)
+
+#### Abnahmekriterien
+
+- Jede der vier Zonen besitzt im eigenen Block ein eigenes Bedienelement zur Profilauswahl mit den vier Optionen Rind, Schwein, Geflügel und Fisch
+- Die globale Auswahl-Leiste oberhalb der Blöcke aus der ursprünglichen DSP-REQ-04 ist entfernt
+- Wechsel des Profils einer Zone aktualisiert ausschließlich diese Zone (Skala, Garstufe, Legende, Indikator); die anderen drei Zonen bleiben in Anzeige und gewähltem Profil unverändert
+- Die Auswahl pro Zone wird im `localStorage` des Browsers unter eindeutigen Schlüsseln pro Zone gespeichert (z. B. `gt_profile_z0`..`gt_profile_z3`)
+- Beim Laden der Seite werden die gespeicherten Profile aus `localStorage` gelesen und angewendet; fehlende oder ungültige Einträge werden auf das Standardprofil „Rind" gesetzt
+- Die Profilauswahl bleibt eine reine Browser-Einstellung — keine Änderung an `Config_Data_t`, kein NVS-Schreibzugriff, kein Cross-Browser-Sync
+- SSE-Updates (WEB-REQ-06/07) bleiben unverändert: der Server liefert weiterhin nur die Messwerte, das Frontend mappt sie auf das jeweils zonenspezifisch gewählte Profil
+
+---
+
 ## 3. Änderungshistorie
 
 | Version | Datum      | Autor | Änderung |
@@ -262,3 +298,5 @@ Bei `valid = false` wird `--` angezeigt (z. B. wenn noch kein Sensorwert vorlieg
 | 1.1     | 2026-05-29 |       | DSP-REQ-01..05 im Webserver umgesetzt (`app/src/webserver.c`: vier Zonenblöcke, Profilauswahl, Farbbalken mit Indikator) |
 | 1.2     | 2026-05-29 |       | DSP-REQ-01 auf zweispaltiges 2 × 2-Layout für Landscape-Geräte erweitert; Fallback auf einspaltig bei Fensterbreite < 600 px |
 | 1.3     | 2026-05-29 |       | DSP-REQ-06 ergänzt und umgesetzt: Gasflaschen-Füllstand (digital + Farbbalken 0–100 %, Rot/Gelb/Grün); SSE-Feld `gas`, Shell-Befehle `gas set`/`gas clear` |
+| 1.4     | 2026-05-30 |       | DSP-REQ-07 ergänzt: zonenspezifische Profilauswahl (per-Zone-Chip/Dropdown im Block, localStorage-Persistenz, Default „Rind"). DSP-REQ-04 auf Datenkatalog reduziert (globale Chip-Leiste entfällt mit DSP-REQ-07). DSP-REQ-03 und DSP-REQ-05 entsprechend referenziert. Übersicht aktualisiert. |
+| 1.5     | 2026-05-30 |       | DSP-REQ-07 umgesetzt: Per-Zone-Chip-Bar im Block (`k_ZoneProfA/B`), JS `cp[4]`, `applyPr/setPr`, `localStorage`-Persistenz mit Default „Rind", SSE wendet pro Zone `PR[cp[i]]` an |

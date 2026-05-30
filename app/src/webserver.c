@@ -46,7 +46,8 @@ static const char k_HtmlCss[] =
     "body{font-family:sans-serif;margin:0;padding:12px;background:#fafafa;color:#222;}"
     ".hdr{text-align:center;background:#f4f4f4;padding:12px;"
     "border:2px solid #000;border-radius:6px;}"
-    ".pr{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:14px 0;}"
+    /* DSP-REQ-07: pro Zone, im Block — kompakter als die alte globale Leiste */
+    ".pr{display:flex;gap:4px;justify-content:center;flex-wrap:wrap;margin:8px 0 0;}"
     ".ch{padding:6px 14px;border:1px solid #888;border-radius:14px;"
     "background:#fff;color:#222;cursor:pointer;font:inherit;}"
     ".ch.a{background:#0a7;border-color:#0a7;color:#fff;}"
@@ -77,21 +78,22 @@ static const char k_HtmlCss[] =
 
 static const char k_HtmlAfterH1[] = "</h1></div>";
 
-/* DSP-REQ-04: Profil-Auswahl-Leiste oberhalb der Bloecke */
-static const char k_HtmlProfiles[] =
-    "<div class=\"pr\">"
-    "<button class=\"ch a\" data-p=\"rind\">Rind</button>"
-    "<button class=\"ch\" data-p=\"schwein\">Schwein</button>"
-    "<button class=\"ch\" data-p=\"gefluegel\">Gefl&uuml;gel</button>"
-    "<button class=\"ch\" data-p=\"fisch\">Fisch</button>"
-    "</div>";
-
 /* DSP-REQ-01: Grid-Container und Block-Fragmente (ein Block je Grillzone) */
 static const char k_GridOpen[]   = "<div class=\"gr\">";
 static const char k_GridClose[]  = "</div>";
 static const char k_BlockOpen[]  = "<div class=\"bl\"><div class=\"zh\">Zone ";
 static const char k_BlockMid[]   = "</div><div class=\"ds\">";
-static const char k_BlockClose[] = "</div></div>";
+static const char k_DsClose[]    = "</div>";              /* schliesst .ds */
+static const char k_BlockClose[] = "</div>";              /* schliesst .bl */
+
+/* DSP-REQ-07: Profil-Auswahlleiste pro Zone. Zwischen A und B wird die
+ * 0-basierte Zonenziffer ('0'..'3') eingefuegt; das JS liest data-z. */
+static const char k_ZoneProfA[] = "<div class=\"pr\" data-z=\"";
+static const char k_ZoneProfB[] =
+    "\"><button class=\"ch\" data-p=\"rind\">Rind</button>"
+    "<button class=\"ch\" data-p=\"schwein\">Schwein</button>"
+    "<button class=\"ch\" data-p=\"gefluegel\">Gefl&uuml;gel</button>"
+    "<button class=\"ch\" data-p=\"fisch\">Fisch</button></div>";
 
 /* DSP-REQ-02 / DSP-REQ-03: Anzeige-Fragmente.
  * id-Praefix b -> Garraum, c -> Kern; angehaengte Ziffer 1..4 = Zonenindex. */
@@ -117,14 +119,15 @@ static const char k_GasClose[] =
     "</div><div class=\"br\"><div class=\"in\"></div></div></div>";
 static const char k_PctUnit[]  = "&nbsp;%";
 
-/* DSP-REQ-02..05 + WEB-REQ-07: clientseitige Logik
- *   GR  = Garraum-Konfiguration (Bereich 0..450 °C, Farbbaender, Zonennamen)
- *   PR  = Grillgut-Profile (Rind, Schwein, Gefluegel, Fisch) mit Garstufen
- *   cp  = aktives Profil (Default 'rind')
- *   LD  = letzte SSE-Werte, damit Profilwechsel Kernanzeige sofort neu rendert
- *   up(): aktualisiert Wert, Indikatorposition und Zonen-/Garstufenname.
- *         Klemmt unterhalb p.mn auf 0%, oberhalb p.mx auf 100% mit letzter Stufe.
- *   setPr(): wechselt Profil, faerbt Kern-Baender neu, baut Legende, rendert. */
+/* DSP-REQ-02..07 + WEB-REQ-07: clientseitige Logik
+ *   GR     = Garraum-Konfiguration (Bereich 0..450 °C, Farbbaender, Zonennamen)
+ *   PR     = Grillgut-Profile (Rind, Schwein, Gefluegel, Fisch) — Datenkatalog (DSP-REQ-04)
+ *   cp[z]  = je Zone (0..3) aktives Profil (DSP-REQ-07; Default 'rind')
+ *   LD     = letzte SSE-Werte, damit Profilwechsel Kernanzeige sofort neu rendert
+ *   up()   : aktualisiert Wert, Indikatorposition und Zonen-/Garstufenname.
+ *            Klemmt unterhalb p.mn auf 0%, oberhalb p.mx auf 100% mit letzter Stufe.
+ *   applyPr(z,n): nur visuell — Skala, Legende, Chip-Aktivzustand, Indikator (Zone z).
+ *   setPr(z,n):   applyPr + localStorage-Persistenz (DSP-REQ-07, Schluessel gt_profile_zN). */
 static const char k_HtmlScript[] =
     "<script>"
     "var GR={mn:0,mx:450,"
@@ -150,7 +153,8 @@ static const char k_HtmlScript[] =
     "var GS={mn:0,mx:100,u:'&nbsp;%',"
     "bd:[{f:0,t:5,c:'#e03030'},{f:5,t:10,c:'#ffd040'},"
     "{f:10,t:100,c:'#30b040'}]};"
-    "var cp='rind';"
+    /* DSP-REQ-07: Profilauswahl pro Zone (Index 0..3) */
+    "var cp=['rind','rind','rind','rind'];"
     "var LD={b:[null,null,null,null],c:[null,null,null,null]};"
     "function grad(mn,mx,a){var p=[],i,b,p1,p2;"
     "for(i=0;i<a.length;i++){b=a[i];"
@@ -172,28 +176,40 @@ static const char k_HtmlScript[] =
     "else if(e.v>p.mx){pos=100;if(arr)sn=arr[arr.length-1].n;}"
     "else{pos=(e.v-p.mn)/(p.mx-p.mn)*100;if(arr)sn=nm(e.v,arr);}"
     "ind.style.left=pos+'%';if(zo)zo.textContent=sn;}"
-    "function setPr(n){cp=n;var p=PR[n],i,j,bar,lg,h;"
-    "var ch=document.querySelectorAll('.ch');"
-    "for(i=0;i<ch.length;i++)ch[i].classList.toggle('a',ch[i].dataset.p===n);"
-    "for(i=1;i<=4;i++){"
-    "bar=document.querySelector('#c'+i+' .br');"
+    /* DSP-REQ-07: nur visuell — kein localStorage-Write (fuer Initial-Render) */
+    "function applyPr(z,n){if(!PR[n])return;cp[z]=n;"
+    "var row=document.querySelector('.pr[data-z=\"'+z+'\"]');"
+    "if(row){var ch=row.querySelectorAll('.ch'),i;"
+    "for(i=0;i<ch.length;i++)ch[i].classList.toggle('a',ch[i].dataset.p===n);}"
+    "var p=PR[n],j,bar,lg,h;"
+    "bar=document.querySelector('#c'+(z+1)+' .br');"
     "bar.style.background=grad(p.mn,p.mx,p.s);"
-    "lg=document.querySelector('#c'+i+' .lg');h='';"
+    "lg=document.querySelector('#c'+(z+1)+' .lg');h='';"
     "for(j=0;j<p.s.length;j++)"
     "h+='<span class=\"dot\" style=\"background:'+p.s[j].c+'\"></span>'+p.s[j].n;"
     "lg.innerHTML=h;"
-    "if(LD.c[i-1])up('c'+i,LD.c[i-1],p);}}"
+    "if(LD.c[z])up('c'+(z+1),LD.c[z],p);}"
+    /* DSP-REQ-07: applyPr + Persistenz (Browser-lokal, kein Server-State) */
+    "function setPr(z,n){applyPr(z,n);"
+    "try{localStorage.setItem('gt_profile_z'+z,n);}catch(e){}}"
+    /* Garraum-Baender und Gas-Band einmalig faerben */
     "for(var i=1;i<=4;i++)"
     "document.querySelector('#b'+i+' .br').style.background=grad(GR.mn,GR.mx,GR.bd);"
     "document.querySelector('#g .br').style.background=grad(GS.mn,GS.mx,GS.bd);"
-    "setPr('rind');"
-    "var ch=document.querySelectorAll('.ch');"
-    "for(var k=0;k<ch.length;k++)ch[k].onclick=function(){setPr(this.dataset.p);};"
+    /* DSP-REQ-07: Profile aus localStorage laden, fehlende/ungueltige -> 'rind' */
+    "for(var z=0;z<4;z++){var v=null;"
+    "try{v=localStorage.getItem('gt_profile_z'+z);}catch(e){}"
+    "if(v&&PR[v])cp[z]=v;applyPr(z,cp[z]);}"
+    /* Per-Chip-Handler: ermittelt Zone aus dem umschliessenden .pr[data-z] */
+    "var allCh=document.querySelectorAll('.pr .ch');"
+    "for(var k=0;k<allCh.length;k++)allCh[k].onclick=function(){"
+    "var row=this.closest('.pr');if(!row)return;"
+    "setPr(parseInt(row.dataset.z,10),this.dataset.p);};"
     "var es=new EventSource('/events');"
     "es.onmessage=function(e){var d=JSON.parse(e.data),i;"
     "for(i=0;i<4;i++){LD.b[i]=d.burner[i];LD.c[i]=d.core[i];"
     "up('b'+(i+1),d.burner[i],GR);"
-    "up('c'+(i+1),d.core[i],PR[cp]);}"
+    "up('c'+(i+1),d.core[i],PR[cp[i]]);}"
     "if(d.gas)up('g',d.gas,GS);};"
     "</script></body></html>";
 
@@ -326,15 +342,17 @@ static int Webserver_BuildHtml(const char *hostname, const Temp_Data_t *data)
     Buf_Append(&ctx, hostname,      hLen);
     Buf_Append(&ctx, k_HtmlAfterH1, sizeof(k_HtmlAfterH1) - 1U);
 
-    /* DSP-REQ-04: Profil-Auswahl */
-    Buf_Append(&ctx, k_HtmlProfiles, sizeof(k_HtmlProfiles) - 1U);
-
     /* DSP-REQ-01: zweispaltiges Raster (2 x 2) fuer die vier Zonenbloecke */
     Buf_Append(&ctx, k_GridOpen, sizeof(k_GridOpen) - 1U);
 
-    /* DSP-REQ-01: vier Zonenbloecke, je mit Garraum- und Kernanzeige */
+    /* DSP-REQ-01: vier Zonenbloecke, je mit Garraum-, Kernanzeige und
+     * DSP-REQ-07-Profilauswahl. zoneCh ist die 1-basierte Anzeigeziffer
+     * (Heading + DOM-IDs), zoneIdx0Ch die 0-basierte Indexziffer fuer data-z. */
     for (i = 0U; i < (uint8_t)TEMP_ZONE_COUNT; i++) {
-        zoneCh = (char)('0' + (char)(i + 1U));
+        char zoneIdx0Ch;
+
+        zoneCh     = (char)('0' + (char)(i + 1U));
+        zoneIdx0Ch = (char)('0' + (char)i);
 
         Buf_Append(&ctx, k_BlockOpen, sizeof(k_BlockOpen) - 1U);
         Buf_Append(&ctx, &zoneCh, 1U);
@@ -349,6 +367,11 @@ static int Webserver_BuildHtml(const char *hostname, const Temp_Data_t *data)
                            k_LblKern, sizeof(k_LblKern) - 1U,
                            &data->core[i], true);
 
+        /* .ds schliessen, dann Per-Zone-Chip-Bar (DSP-REQ-07), dann .bl schliessen */
+        Buf_Append(&ctx, k_DsClose,    sizeof(k_DsClose)    - 1U);
+        Buf_Append(&ctx, k_ZoneProfA,  sizeof(k_ZoneProfA)  - 1U);
+        Buf_Append(&ctx, &zoneIdx0Ch, 1U);
+        Buf_Append(&ctx, k_ZoneProfB,  sizeof(k_ZoneProfB)  - 1U);
         Buf_Append(&ctx, k_BlockClose, sizeof(k_BlockClose) - 1U);
     }
 

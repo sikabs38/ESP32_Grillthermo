@@ -14,6 +14,10 @@
 #define CFG_PIN_MAX_LEN            (6U)
 #define CFG_PIN_BUF_SIZE           (CFG_PIN_MAX_LEN + 1U)
 #define CFG_PIN_DEFAULT            "000000"
+/* BLE-REQ-07: MAC des gekoppelten Otto-Wilde-G32 als Zeichenkette
+ * "AA:BB:CC:DD:EE:FF" (17 Zeichen + Nullterminator). Leer = keine Kopplung. */
+#define CFG_GRILL_MAC_STR_LEN      (17U)
+#define CFG_GRILL_MAC_BUF_SIZE     (CFG_GRILL_MAC_STR_LEN + 1U)
 
 /* CFG-REQ-04: Konfigurationsparameter */
 typedef struct {
@@ -23,6 +27,7 @@ typedef struct {
     char     mqttBroker[CFG_MQTT_BROKER_MAX_LEN + 1U];
     uint16_t mqttPort;
     char     pin[CFG_PIN_BUF_SIZE];                    /* TODO: CFG-REQ-05 AES */
+    char     grillMac[CFG_GRILL_MAC_BUF_SIZE];         /* BLE-REQ-07 */
 } Config_Data_t;
 
 int  Config_Init(void);

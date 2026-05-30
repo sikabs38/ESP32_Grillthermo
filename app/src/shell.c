@@ -1,6 +1,7 @@
 /* SHL-REQ-01, SHL-REQ-06, SHL-REQ-07, SHL-REQ-08: Shell, Login, Bootmeldung, Bootloader */
 #include "config.h"
 #include "wifi.h"
+#include "bluetooth.h"
 #include "temp_data.h"
 
 #include <zephyr/kernel.h>
@@ -481,6 +482,9 @@ static int Shell_CmdConfigShow(const struct shell *sh, size_t argc, char **argv)
     shell_print(sh, "MQTT Broker  : %s",
                 (g_Config.mqttBroker[0] != '\0') ? g_Config.mqttBroker : "[nicht gesetzt]");
     shell_print(sh, "MQTT Port    : %u", (unsigned int)g_Config.mqttPort);
+    /* BLE-REQ-07: Grill-MAC im config-show ausgeben */
+    shell_print(sh, "Grill MAC    : %s",
+                (g_Config.grillMac[0] != '\0') ? g_Config.grillMac : "[nicht gesetzt]");
 
     return 0;
 }
@@ -930,10 +934,188 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_gas,
     SHELL_SUBCMD_SET_END
 );
 
+/* ------------------------------------------------------------------ */
+/* bt — Bluetooth-Kopplung mit Otto Wilde G32              BLE-REQ-03 */
+/* ------------------------------------------------------------------ */
+
+/* BLE-REQ-03: MAC-Format "AA:BB:CC:DD:EE:FF" pruefen */
+static bool Shell_BtMacIsValid(const char *mac)
+{
+    size_t i;
+
+    if (mac == NULL) {
+        return false;
+    }
+    if (strlen(mac) != CFG_GRILL_MAC_STR_LEN) {
+        return false;
+    }
+    for (i = 0U; i < CFG_GRILL_MAC_STR_LEN; i++) {
+        char c = mac[i];
+        if (((i + 1U) % 3U) == 0U) {
+            if (c != ':') {
+                return false;
+            }
+        } else {
+            bool isDigit = (c >= '0') && (c <= '9');
+            bool isUpper = (c >= 'A') && (c <= 'F');
+            bool isLower = (c >= 'a') && (c <= 'f');
+            if (!isDigit && !isUpper && !isLower) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+/* BLE-REQ-03: bt scan [all] */
+static int Shell_CmdBtScan(const struct shell *sh, size_t argc, char **argv)
+{
+    bool filterByG32 = true;
+    int  rc;
+
+    if (!Shell_CheckAuth(sh)) {
+        return -EACCES;
+    }
+
+    if (argc >= 2) {
+        if (strcmp(argv[1], "all") == 0) {
+            filterByG32 = false;
+        } else if (strcmp(argv[1], "stop") == 0) {
+            rc = Bluetooth_ScanStop();
+            if (rc < 0) {
+                shell_error(sh, "Scan-Stop fehlgeschlagen: %d", rc);
+                return rc;
+            }
+            return 0;
+        } else {
+            shell_error(sh, "Verwendung: bt scan [all|stop]");
+            return -EINVAL;
+        }
+    }
+
+    rc = Bluetooth_ScanStart(filterByG32);
+    if (rc == -EALREADY) {
+        shell_warn(sh, "Scan laeuft bereits.");
+        return 0;
+    }
+    if (rc < 0) {
+        shell_error(sh, "Scan-Start fehlgeschlagen: %d", rc);
+        return rc;
+    }
+    return 0;
+}
+
+/* BLE-REQ-03/07/08: bt pair <mac> */
+static int Shell_CmdBtPair(const struct shell *sh, size_t argc, char **argv)
+{
+    int rc;
+
+    ARG_UNUSED(argc);
+
+    if (!Shell_CheckAuth(sh)) {
+        return -EACCES;
+    }
+
+    if (!Shell_BtMacIsValid(argv[1])) {
+        shell_error(sh, "Ungueltige MAC. Format: AA:BB:CC:DD:EE:FF");
+        return -EINVAL;
+    }
+
+    /* BLE-REQ-07: MAC persistent in g_Config ablegen */
+    (void)strncpy(g_Config.grillMac, argv[1], CFG_GRILL_MAC_STR_LEN);
+    g_Config.grillMac[CFG_GRILL_MAC_STR_LEN] = '\0';
+
+    rc = Config_Save(&g_Config);
+    if (rc < 0) {
+        shell_error(sh, "Speicherfehler: %d", rc);
+        return rc;
+    }
+
+    shell_print(sh, "Grill-MAC gespeichert: %s", g_Config.grillMac);
+    /* BLE-REQ-08: Verbindungsversuch ausloesen */
+    (void)Bluetooth_Reconnect();
+    return 0;
+}
+
+/* BLE-REQ-03/07: bt unpair */
+static int Shell_CmdBtUnpair(const struct shell *sh, size_t argc, char **argv)
+{
+    int rc;
+
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+
+    if (!Shell_CheckAuth(sh)) {
+        return -EACCES;
+    }
+
+    if (g_Config.grillMac[0] == '\0') {
+        shell_print(sh, "Keine Kopplung gespeichert.");
+        return 0;
+    }
+
+    g_Config.grillMac[0] = '\0';
+    rc = Config_Save(&g_Config);
+    if (rc < 0) {
+        shell_error(sh, "Speicherfehler: %d", rc);
+        return rc;
+    }
+
+    (void)Bluetooth_Disconnect();
+    shell_print(sh, "Kopplung entfernt.");
+    return 0;
+}
+
+/* BLE-REQ-10: bt status */
+static int Shell_CmdBtStatus(const struct shell *sh, size_t argc, char **argv)
+{
+    Bluetooth_Status_t status;
+
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+
+    if (!Shell_CheckAuth(sh)) {
+        return -EACCES;
+    }
+
+    Bluetooth_GetStatus(&status);
+
+    shell_print(sh, "BT Status    : %s",
+                status.connected ? "Verbunden" : "Getrennt");
+    shell_print(sh, "Gekoppelt    : %s",
+                status.paired ? "Ja" : "Nein");
+    if (status.peerMac[0] != '\0') {
+        shell_print(sh, "Grill MAC    : %s", status.peerMac);
+    }
+    if (status.connected) {
+        int64_t  nowMs = k_uptime_get();
+        uint32_t ageMs = (uint32_t)(nowMs - (int64_t)status.lastPacketUptimeMs);
+        shell_print(sh, "Letztes Paket: vor %u ms", (unsigned int)ageMs);
+    }
+    return 0;
+}
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_bt,
+    SHELL_CMD_ARG(scan,   NULL,
+                  "Geraete-Scan: [all] alle, [stop] beenden, sonst nur G32",
+                  Shell_CmdBtScan,   1, 1),
+    SHELL_CMD_ARG(pair,   NULL,
+                  "Kopplung speichern und verbinden: <AA:BB:CC:DD:EE:FF>",
+                  Shell_CmdBtPair,   2, 0),
+    SHELL_CMD(    unpair, NULL,
+                  "Kopplung entfernen und Verbindung trennen",
+                  Shell_CmdBtUnpair),
+    SHELL_CMD(    status, NULL,
+                  "Bluetooth-Status anzeigen",
+                  Shell_CmdBtStatus),
+    SHELL_SUBCMD_SET_END
+);
+
 SHELL_CMD_REGISTER(logout,     NULL,        "Abmelden",                         Shell_CmdLogout);
 SHELL_CMD_REGISTER(wifi,       &sub_wifi,   "WiFi-Konfiguration",               NULL);
 SHELL_CMD_REGISTER(mqtt,       &sub_mqtt,   "MQTT-Konfiguration",               NULL);
 SHELL_CMD_REGISTER(config,     &sub_config, "Systemkonfiguration",              NULL);
 SHELL_CMD_REGISTER(temp,       &sub_temp,   "Temperaturwerte setzen (Test)",    NULL);
 SHELL_CMD_REGISTER(gas,        &sub_gas,    "Gasflaschen-Fuellstand setzen (Test)", NULL);
+SHELL_CMD_REGISTER(bt,         &sub_bt,     "Bluetooth-Kopplung mit Otto Wilde G32", NULL);
 SHELL_CMD_REGISTER(bootloader, NULL,        "In Download-Modus wechseln",       Shell_CmdBootloader);

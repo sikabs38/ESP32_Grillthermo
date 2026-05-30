@@ -11,6 +11,8 @@ target_sources(app PRIVATE
     src/wifi.c
     src/webserver.c
     src/temp_data.c
+    src/bluetooth.c
+    src/coex_printf.c
 )
 
 zephyr_linker_sources(SECTIONS sections-rom.ld)

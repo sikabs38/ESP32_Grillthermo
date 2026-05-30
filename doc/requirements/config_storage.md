@@ -88,13 +88,15 @@ Das System soll folgende Konfigurationsparameter persistent speichern:
 |-----------------|---------|-------------|--------------|---------------|
 | WiFi SSID       | String  | 32 Zeichen  | `[leer]`     | Nein          |
 | WiFi Passwort   | String  | 64 Zeichen  | `[leer]`     | Ja (AES)      |
+| WiFi Hostname   | String  | 63 Zeichen  | `[leer]`     | Nein          |
 | MQTT Broker     | String  | 128 Zeichen | `[leer]`     | Nein          |
 | MQTT Port       | uint16  | —           | `1883`       | Nein          |
 | Shell-PIN       | String  | 4–6 Ziffern | `000000`     | Ja (AES)      |
+| Grill-MAC       | String  | 17 Zeichen (`AA:BB:CC:DD:EE:FF`) | `[leer]` | Nein |
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Umgesetzt | `app/src/config.h:Config_Data_t`, `app/src/config.c:Config_GetDefaults()`, `app/src/shell.c:g_Config` |
+| Hoch      | Umgesetzt | `app/src/config.h:Config_Data_t` (inkl. `grillMac`, BLE-REQ-07), `app/src/config.c:Config_GetDefaults()`, `app/src/shell.c:g_Config` |
 
 #### Abhängigkeiten
 
@@ -243,3 +245,4 @@ Ein Lese- oder Schreibfehler im nichtflüchtigen Speicher darf nicht zum Absturz
 | 1.2     | 2026-05-26 |       | CFG-REQ-03 präzisiert: Reset setzt alle Parameter inkl. PIN auf Standardwerte; CFG-REQ-04: Shell-PIN als Parameter ergänzt |
 | 1.3     | 2026-05-27 |       | CFG-REQ-06 ergänzt: 3-Generationen-Speicher mit CRC32 und Gültigkeitsflag; Implementierungsstatus aktualisiert |
 | 1.4     | 2026-05-27 |       | Skill-Alignment: Status „Implementiert" → „Umgesetzt", MISRA C → MISRA C 2023, Bestätigungstext CFG-REQ-03 korrigiert |
+| 1.5     | 2026-05-30 |       | CFG-REQ-04 um `Grill-MAC` (BLE-REQ-07) und den bereits umgesetzten `WiFi Hostname` (WIF-REQ-06) ergänzt |

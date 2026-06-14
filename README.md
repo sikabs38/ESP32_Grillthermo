@@ -65,6 +65,25 @@ West und das Zephyr SDK müssen installiert sein. Siehe [Zephyr Getting Started 
 
 **Wichtig:** `ZEPHYR_BASE` darf **nicht** gesetzt sein. Dieses Projekt bringt über `west.yml` sein eigenes, auf einen festen Commit gepinntes Zephyr mit (eigener west-Workspace). Ein global gesetztes `ZEPHYR_BASE` (z. B. aus `~/.bashrc`) würde den Build auf ein anderes Zephyr umlenken — in dem Fall den Export entfernen.
 
+### Python-Umgebung einrichten
+
+Zephyr und west benötigen eine Python-Virtual-Environment im Workspace-Topdir:
+
+```bash
+cd esp32-grillthermo-ws
+python3 -m venv .venv
+source .venv/bin/activate
+pip install west
+```
+
+Nach dem ersten `west update` (siehe unten) die Zephyr-Abhängigkeiten nachinstallieren:
+
+```bash
+pip install -r zephyr/scripts/requirements.txt
+```
+
+**Hinweis:** Die Aktivierung (`source .venv/bin/activate`) muss in jeder neuen Shell-Session wiederholt werden, bevor `west` verwendet wird.
+
 ### Workspace einrichten
 
 Das Repo ist das Manifest-Repo eines eigenen west-Workspace. Zephyr und die Module liegen **neben** dem Repo im Workspace-Topdir (deshalb in `.gitignore`, nicht im Repo selbst):

@@ -2,7 +2,14 @@
 
 ## 1. Übersicht
 
-Die Webanzeige stellt vier Temperaturblöcke dar — einen pro Grillzone. Jeder Block besteht aus zwei nebeneinander angeordneten Anzeigefeldern: Garraumtemperatur und Kerntemperatur des Grillguts. Beide Felder sind identisch aufgebaut und folgen demselben visuellen Schema. Das Grillgut-Profil ist pro Zone unabhängig einstellbar (DSP-REQ-07), sodass z. B. in Zone 1 Rind und in Zone 2 Geflügel gleichzeitig überwacht werden können. Unterhalb der vier Blöcke wird der Gasflaschen-Füllstand zentriert dargestellt (DSP-REQ-06).
+Die Webanzeige ist in zwei übereinander liegende Sektionen gegliedert:
+
+- **Brenner-Sektion** (oben): vier Garraumtemperaturen (Zone 1–4) nebeneinander in einem 4-spaltigen Raster.
+- **Kern-Sektion** (unten): vier Kerntemperaturen (Zone 1–4) im gleichen Raster, jeweils mit zonenspezifischer Profilauswahl (DSP-REQ-07).
+
+Unterhalb beider Sektionen wird der Gasflaschen-Füllstand zentriert dargestellt (DSP-REQ-06).
+
+Das Grillgut-Profil ist pro Zone unabhängig einstellbar, sodass z. B. in Zone 1 Rind und in Zone 2 Geflügel gleichzeitig überwacht werden können.
 
 Grundlage: `doc/G32_Anzeige_Beschreibung.docx`, Version 1.0 vom 29. Mai 2026.
 
@@ -14,13 +21,16 @@ Grundlage: `doc/G32_Anzeige_Beschreibung.docx`, Version 1.0 vom 29. Mai 2026.
 
 #### Beschreibung
 
-Die Anzeige soll vier Temperaturblöcke darstellen, einen pro Grillzone (Index 0..3, entsprechend `burner[0..3]` und `core[0..3]` aus TMP-REQ-01). Jeder Block enthält links eine Garraumtemperatur-Anzeige (DSP-REQ-02) und rechts eine Kerntemperatur-Anzeige (DSP-REQ-03).
+Die Anzeige soll die Messwerte in zwei getrennten, übereinander angeordneten Sektionen darstellen:
 
-Die vier Blöcke werden in einem zweispaltigen Raster (2 × 2) angeordnet, da die typischen Anzeigegeräte (Tablet, Notebook, Desktop) im Querformat (Landscape) betrieben werden. Auf sehr schmalen Bildschirmen (Portrait, Breite < 600 px) fällt die Anordnung auf einspaltig zurück, damit die Inhalte lesbar bleiben.
+- **Brenner-Sektion** mit Überschrift „Brenner": vier Garraumtemperatur-Blöcke (DSP-REQ-02), je einer pro Zone (Index 0..3, entsprechend `burner[0..3]`).
+- **Kern-Sektion** mit Überschrift „Kern": vier Kerntemperatur-Blöcke (DSP-REQ-03), je einer pro Zone (Index 0..3, entsprechend `core[0..3]`), mit zonenspezifischer Profilauswahl (DSP-REQ-07).
+
+Innerhalb jeder Sektion sind die vier Blöcke in einem vierspaltigen Raster angeordnet. Auf mittelbreiten Bildschirmen (Breite < 700 px) wechselt das Raster auf zwei Spalten; auf sehr schmalen Bildschirmen (< 400 px) auf eine Spalte.
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch | Umgesetzt | `app/src/webserver.c:Webserver_BuildHtml()` Schleife über `TEMP_ZONE_COUNT`; Block-Fragmente `k_BlockOpen`/`k_BlockMid`/`k_BlockClose`; Grid-Container `k_GridOpen`/`k_GridClose` mit CSS-Klasse `.gr` (zwei Spalten, Media-Query für Portrait) |
+| Hoch | Umgesetzt | `app/src/webserver.c:Webserver_BuildHtml()`: zwei Schleifen über `TEMP_ZONE_COUNT`; Sektions-Container `k_BurnerSecOpen`/`k_CoreSecOpen`/`k_SecClose`; Block-Fragmente `k_BlkOpenA`/`k_BlkOpenB`/`k_BlkOpenC`/`k_BlkClose`; CSS-Klasse `.gr4` (vier Spalten, Media-Queries für < 700 px und < 400 px) |
 
 #### Abhängigkeiten
 
@@ -28,11 +38,12 @@ Die vier Blöcke werden in einem zweispaltigen Raster (2 × 2) angeordnet, da di
 
 #### Abnahmekriterien
 
-- Die Anzeige enthält genau vier Temperaturblöcke
-- Jeder Block zeigt Garraum- und Kerntemperatur derselben Grillzone
-- Die Blöcke sind eindeutig den Grillzonen 1..4 zugeordnet
-- Im Landscape-Modus (Fensterbreite ≥ 600 px) sind die Blöcke in zwei Spalten (2 × 2) angeordnet
-- Bei Fensterbreite < 600 px wechselt die Anordnung auf eine Spalte (vier Blöcke untereinander)
+- Die Anzeige enthält eine Brenner-Sektion mit Überschrift „Brenner" und eine Kern-Sektion mit Überschrift „Kern"
+- Jede Sektion enthält genau vier Blöcke (Zone 1..4)
+- Brenner- und Kern-Blöcke derselben Zone tragen dieselbe Zonenziffer (Zone 1..4)
+- Bei Fensterbreite ≥ 700 px sind die Blöcke innerhalb jeder Sektion in vier Spalten dargestellt
+- Bei Fensterbreite 400..699 px wechselt das Raster auf zwei Spalten
+- Bei Fensterbreite < 400 px wechselt das Raster auf eine Spalte
 
 ---
 
@@ -300,3 +311,4 @@ Mit der Umsetzung dieser Anforderung entfällt die ursprünglich in DSP-REQ-04 b
 | 1.3     | 2026-05-29 |       | DSP-REQ-06 ergänzt und umgesetzt: Gasflaschen-Füllstand (digital + Farbbalken 0–100 %, Rot/Gelb/Grün); SSE-Feld `gas`, Shell-Befehle `gas set`/`gas clear` |
 | 1.4     | 2026-05-30 |       | DSP-REQ-07 ergänzt: zonenspezifische Profilauswahl (per-Zone-Chip/Dropdown im Block, localStorage-Persistenz, Default „Rind"). DSP-REQ-04 auf Datenkatalog reduziert (globale Chip-Leiste entfällt mit DSP-REQ-07). DSP-REQ-03 und DSP-REQ-05 entsprechend referenziert. Übersicht aktualisiert. |
 | 1.5     | 2026-05-30 |       | DSP-REQ-07 umgesetzt: Per-Zone-Chip-Bar im Block (`k_ZoneProfA/B`), JS `cp[4]`, `applyPr/setPr`, `localStorage`-Persistenz mit Default „Rind", SSE wendet pro Zone `PR[cp[i]]` an |
+| 1.6     | 2026-06-14 |       | DSP-REQ-01 geändert: Brenner und Kern in getrennte Sektionen aufgeteilt; Brenner oben, Kern unten; 4-spaltiges Raster (`.gr4`) statt 2×2-Block-Raster; Übersicht aktualisiert |

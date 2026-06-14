@@ -28,6 +28,8 @@ LOG_MODULE_REGISTER(bluetooth_app, LOG_LEVEL_INF);
 #define BT_SCAN_MAX_RESULTS       (16U)
 /* BLE-REQ-08: Wiederverbindungsintervall (10 s) */
 #define BT_RECONNECT_INTERVAL_MS  (10000U)
+/* BLE-REQ-08: Verbindungsaufbau-Timeout — Grill nicht in Reichweite (Einheit 10 ms) */
+#define BT_CONNECT_TIMEOUT_10MS   (3000U)
 
 /* BLE-REQ-04..06: Mindest-Payload-Groesse, ab der wir parsen
  * (mindestens bis Ende Gas-Gewicht-Bytes). Kleinere Pakete werden verworfen.
@@ -59,6 +61,16 @@ static struct bt_uuid_128 g_G32ServiceUuid = BT_UUID_INIT_128(
 static struct bt_uuid_128 g_G32TxCharUuid = BT_UUID_INIT_128(
     BT_UUID_128_ENCODE(0xdc0f41e2U, 0xb6aeU, 0x46a8U, 0xa19eU, 0x1a3bf4342bcbULL));
 static struct bt_uuid_16  g_CccUuid = BT_UUID_INIT_16(BT_UUID_GATT_CCC_VAL);
+
+/* BLE-REQ-08: Verbindungsaufbau-Parameter mit Timeout (verhindert unbegrenztes Scannen) */
+static const struct bt_conn_le_create_param g_CreateParam = {
+    .options        = BT_CONN_LE_OPT_NONE,
+    .interval       = BT_GAP_SCAN_FAST_INTERVAL,
+    .window         = BT_GAP_SCAN_FAST_INTERVAL,
+    .interval_coded = 0U,
+    .window_coded   = 0U,
+    .timeout        = BT_CONNECT_TIMEOUT_10MS,
+};
 
 /* ------------------------------------------------------------------ */
 /* Statischer Modul-Zustand                                            */
@@ -600,7 +612,7 @@ static int Bt_DoConnect(const char *macStr)
     }
     (void)k_mutex_unlock(&g_StateMutex);
 
-    rc = bt_conn_le_create(&addr, BT_CONN_LE_CREATE_CONN,
+    rc = bt_conn_le_create(&addr, &g_CreateParam,
                            BT_LE_CONN_PARAM_DEFAULT, &g_Conn);
     if (rc != 0) {
         printk("BT: Verbindungsauftrag fehlgeschlagen (%d).\n", rc);

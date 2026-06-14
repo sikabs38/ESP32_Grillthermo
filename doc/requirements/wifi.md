@@ -196,10 +196,32 @@ Keine.
 
 ---
 
+### WIF-REQ-07
+
+#### Beschreibung
+
+Das WiFi-Modul soll nach einem fehlgeschlagenen Verbindungsversuch oder nach Verbindungsverlust automatisch erneut versuchen, eine Verbindung aufzubauen.
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Hoch      | Umgesetzt | `app/src/wifi.c:Wifi_Thread()`, `app/src/wifi.c:Wifi_EventCallback()` |
+
+#### Abhängigkeiten
+
+- WIF-REQ-02 (Thread)
+
+#### Abnahmekriterien
+
+- Schlägt der Verbindungsaufbau fehl (Fehlercode oder Timeout nach 60 s), wird nach 30 s automatisch ein neuer Versuch gestartet
+- Eine Log-Meldung informiert über den bevorstehenden Neuversuch mit dem konfigurierten Intervall
+- Bei Verbindungsverlust (Disconnect-Event) wird sofort ein neuer Verbindungsversuch eingeleitet
+- Manuelle Wiederverbindung via Shell (`Wifi_Reconnect()`) ist weiterhin möglich und hat sofortige Wirkung
+
+---
+
 ## 4. Offene Punkte / Annahmen
 
-- [ ] Wiederverbindungsstrategie: Anzahl und Intervall der Wiederverbindungsversuche noch nicht spezifiziert
-- [ ] Verbindungsüberwachung (Keep-alive / Reconnect bei Verbindungsverlust) noch nicht spezifiziert
+Keine.
 
 ---
 
@@ -211,3 +233,4 @@ Keine.
 | 1.1     | 2026-05-27 |       | WIF-REQ-05 ergänzt: Status-API `Wifi_GetStatus()` |
 | 1.2     | 2026-05-28 |       | WIF-REQ-06 ergänzt: Konfigurierbarer Hostname |
 | 1.3     | 2026-05-28 |       | WIF-REQ-06 umgesetzt |
+| 1.4     | 2026-06-14 |       | WIF-REQ-07 ergänzt und umgesetzt: automatische Wiederverbindung |

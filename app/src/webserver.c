@@ -1,4 +1,4 @@
-/* WEB-REQ-01..09, TMP-REQ-02, TMP-REQ-03, DSP-REQ-01..06 */
+/* WEB-REQ-01..09, TMP-REQ-02, TMP-REQ-03, DSP-REQ-01..07 */
 #include "webserver.h"
 #include "temp_data.h"
 
@@ -39,28 +39,27 @@ static const char k_HtmlA[] =
     "<!DOCTYPE html><html>"
     "<head><meta charset=\"utf-8\"><title>";
 
-/* DSP-REQ-01..04: Layout fuer vier Zonenbloecke, Profilauswahl und Farbbalken. */
+/* DSP-REQ-01: Brenner-Sektion (oben) und Kern-Sektion (unten), je 4-spaltig. */
 static const char k_HtmlCss[] =
     "</title>"
     "<style>"
     "body{font-family:sans-serif;margin:0;padding:12px;background:#fafafa;color:#222;}"
     ".hdr{text-align:center;background:#f4f4f4;padding:12px;"
     "border:2px solid #000;border-radius:6px;}"
-    /* DSP-REQ-07: pro Zone, im Block — kompakter als die alte globale Leiste */
+    /* DSP-REQ-07: pro Zone, im Kern-Block */
     ".pr{display:flex;gap:4px;justify-content:center;flex-wrap:wrap;margin:8px 0 0;}"
     ".ch{padding:6px 14px;border:1px solid #888;border-radius:14px;"
     "background:#fff;color:#222;cursor:pointer;font:inherit;}"
     ".ch.a{background:#0a7;border-color:#0a7;color:#fff;}"
-    /* DSP-REQ-01: zweispaltiges Raster (2 x 2) fuer Landscape-Geraete; */
-    /* Fallback auf eine Spalte unterhalb 600 px Breite. */
-    ".gr{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}"
-    "@media(max-width:600px){.gr{grid-template-columns:1fr;}}"
+    /* DSP-REQ-01: Sektions-Wrapper und 4-spaltiges Raster */
+    ".sec{margin-top:14px;}"
+    ".sh{font-weight:bold;font-size:15px;color:#555;margin:0 0 6px;}"
+    ".gr4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}"
+    "@media(max-width:700px){.gr4{grid-template-columns:repeat(2,1fr);}}"
+    "@media(max-width:400px){.gr4{grid-template-columns:1fr;}}"
     ".bl{border:1px solid #ccc;border-radius:6px;padding:10px;"
-    "background:#fff;}"
+    "background:#fff;text-align:center;}"
     ".zh{font-weight:bold;margin-bottom:8px;text-align:center;color:#555;}"
-    ".ds{display:flex;gap:14px;}"
-    ".dp{flex:1;text-align:center;min-width:0;}"
-    ".dt{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.5px;}"
     ".vl{font-size:28px;font-weight:bold;margin:2px 0;}"
     ".br{position:relative;height:16px;border-radius:8px;background:#ddd;"
     "margin:8px 0 4px;overflow:visible;}"
@@ -70,7 +69,7 @@ static const char k_HtmlCss[] =
     ".lg{font-size:11px;color:#666;margin-top:6px;}"
     ".dot{display:inline-block;width:8px;height:8px;border-radius:50%;"
     "margin:0 3px 0 8px;vertical-align:middle;}"
-    /* DSP-REQ-06: Gasflaschen-Anzeige zentriert unterhalb der Bloecke */
+    /* DSP-REQ-06: Gasflaschen-Anzeige zentriert unterhalb der Sektionen */
     ".gs{margin:14px auto 0;max-width:480px;border:1px solid #ccc;"
     "border-radius:6px;padding:10px;background:#fff;text-align:center;}"
     "</style></head><body>"
@@ -78,13 +77,18 @@ static const char k_HtmlCss[] =
 
 static const char k_HtmlAfterH1[] = "</h1></div>";
 
-/* DSP-REQ-01: Grid-Container und Block-Fragmente (ein Block je Grillzone) */
-static const char k_GridOpen[]   = "<div class=\"gr\">";
-static const char k_GridClose[]  = "</div>";
-static const char k_BlockOpen[]  = "<div class=\"bl\"><div class=\"zh\">Zone ";
-static const char k_BlockMid[]   = "</div><div class=\"ds\">";
-static const char k_DsClose[]    = "</div>";              /* schliesst .ds */
-static const char k_BlockClose[] = "</div>";              /* schliesst .bl */
+/* DSP-REQ-01: Sektions-Container (Brenner oben, Kern unten) und Block-Fragmente.
+ * k_BlkOpenA + Prefix (b/c) + Zonenziffer (1..4) + k_BlkOpenB + Zonenziffer + k_BlkOpenC
+ * ergibt: <div class="bl" id="b1"><div class="zh">Zone 1</div>  */
+static const char k_BurnerSecOpen[] =
+    "<div class=\"sec\"><div class=\"sh\">Brenner</div><div class=\"gr4\">";
+static const char k_CoreSecOpen[]   =
+    "<div class=\"sec\"><div class=\"sh\">Kern</div><div class=\"gr4\">";
+static const char k_SecClose[]      = "</div></div>";
+static const char k_BlkOpenA[]      = "<div class=\"bl\" id=\"";
+static const char k_BlkOpenB[]      = "\"><div class=\"zh\">Zone ";
+static const char k_BlkOpenC[]      = "</div>";
+static const char k_BlkClose[]      = "</div>";
 
 /* DSP-REQ-07: Profil-Auswahlleiste pro Zone. Zwischen A und B wird die
  * 0-basierte Zonenziffer ('0'..'3') eingefuegt; das JS liest data-z. */
@@ -95,19 +99,14 @@ static const char k_ZoneProfB[] =
     "<button class=\"ch\" data-p=\"gefluegel\">Gefl&uuml;gel</button>"
     "<button class=\"ch\" data-p=\"fisch\">Fisch</button></div>";
 
-/* DSP-REQ-02 / DSP-REQ-03: Anzeige-Fragmente.
- * id-Praefix b -> Garraum, c -> Kern; angehaengte Ziffer 1..4 = Zonenindex. */
-static const char k_DispOpenA[]  = "<div class=\"dp\" id=\"";  /* + "bN" / "cN" */
-static const char k_DispOpenB[]  = "\"><div class=\"dt\">";    /* + Label */
-static const char k_DispMid[]    = "</div><div class=\"vl\">"; /* + Wert oder "--" */
-static const char k_DispBar[]    =
+/* DSP-REQ-02 / DSP-REQ-03: Anzeige-Inhalt (Wert, Balken, Zonenname; opt. Legende).
+ * Die id liegt auf dem uebergeordneten .bl-Element; kein .dp-Wrapper mehr. */
+static const char k_DispValOpen[] = "<div class=\"vl\">";
+static const char k_DispBar[]     =
     "</div><div class=\"br\"><div class=\"in\"></div></div>"
     "<div class=\"zn\"></div>";
-static const char k_DispLegend[] = "<div class=\"lg\"></div>";
-static const char k_DispClose[]  = "</div>";
+static const char k_DispLegend[]  = "<div class=\"lg\"></div>";
 
-static const char k_LblGarraum[] = "Garraum";
-static const char k_LblKern[]    = "Kern";
 static const char k_NotAvail[]   = "--";
 static const char k_DegUnit[]    = "&nbsp;&deg;C";
 
@@ -282,18 +281,12 @@ static void Buf_AppendInt16(BufCtx_t *ctx, int16_t val)
 /* Anzeige (DSP-REQ-02 Garraum / DSP-REQ-03 Kern)                      */
 /* ------------------------------------------------------------------ */
 
-/* group: 'b' = Garraum, 'c' = Kern. zoneCh: ASCII-Ziffer '1'..'4'.
- * withLegend = true bei Kernanzeige (DSP-REQ-03: Legende mit Garstufen). */
-static void Html_AppendDisplay(BufCtx_t *ctx, char group, char zoneCh,
-                               const char *label, size_t labelLen,
+/* DSP-REQ-02 / DSP-REQ-03: Anzeigeinhalt (Wert, Balken, Zonenname; opt. Legende).
+ * withLegend = true bei Kernanzeige (DSP-REQ-03). */
+static void Html_AppendDisplay(BufCtx_t *ctx,
                                const Temp_Entry_t *entry, bool withLegend)
 {
-    Buf_Append(ctx, k_DispOpenA, sizeof(k_DispOpenA) - 1U);
-    Buf_Append(ctx, &group, 1U);
-    Buf_Append(ctx, &zoneCh, 1U);
-    Buf_Append(ctx, k_DispOpenB, sizeof(k_DispOpenB) - 1U);
-    Buf_Append(ctx, label, labelLen);
-    Buf_Append(ctx, k_DispMid, sizeof(k_DispMid) - 1U);
+    Buf_Append(ctx, k_DispValOpen, sizeof(k_DispValOpen) - 1U);
 
     if (entry->valid) {
         Buf_AppendInt16(ctx, entry->value);
@@ -306,7 +299,6 @@ static void Html_AppendDisplay(BufCtx_t *ctx, char group, char zoneCh,
     if (withLegend) {
         Buf_Append(ctx, k_DispLegend, sizeof(k_DispLegend) - 1U);
     }
-    Buf_Append(ctx, k_DispClose, sizeof(k_DispClose) - 1U);
 }
 
 /* DSP-REQ-06: Gasflaschen-Anzeige (id "g") — Wert in %, Farbbalken mit Indikator. */
@@ -342,40 +334,40 @@ static int Webserver_BuildHtml(const char *hostname, const Temp_Data_t *data)
     Buf_Append(&ctx, hostname,      hLen);
     Buf_Append(&ctx, k_HtmlAfterH1, sizeof(k_HtmlAfterH1) - 1U);
 
-    /* DSP-REQ-01: zweispaltiges Raster (2 x 2) fuer die vier Zonenbloecke */
-    Buf_Append(&ctx, k_GridOpen, sizeof(k_GridOpen) - 1U);
+    /* DSP-REQ-01: Brenner-Sektion — alle vier Garraumtemperaturen (id b1..b4) */
+    Buf_Append(&ctx, k_BurnerSecOpen, sizeof(k_BurnerSecOpen) - 1U);
+    for (i = 0U; i < (uint8_t)TEMP_ZONE_COUNT; i++) {
+        zoneCh = (char)('0' + (char)(i + 1U));
+        Buf_Append(&ctx, k_BlkOpenA,  sizeof(k_BlkOpenA)  - 1U);
+        Buf_Append(&ctx, "b", 1U);
+        Buf_Append(&ctx, &zoneCh, 1U);
+        Buf_Append(&ctx, k_BlkOpenB,  sizeof(k_BlkOpenB)  - 1U);
+        Buf_Append(&ctx, &zoneCh, 1U);
+        Buf_Append(&ctx, k_BlkOpenC,  sizeof(k_BlkOpenC)  - 1U);
+        Html_AppendDisplay(&ctx, &data->burner[i], false);
+        Buf_Append(&ctx, k_BlkClose,  sizeof(k_BlkClose)  - 1U);
+    }
+    Buf_Append(&ctx, k_SecClose, sizeof(k_SecClose) - 1U);
 
-    /* DSP-REQ-01: vier Zonenbloecke, je mit Garraum-, Kernanzeige und
-     * DSP-REQ-07-Profilauswahl. zoneCh ist die 1-basierte Anzeigeziffer
-     * (Heading + DOM-IDs), zoneIdx0Ch die 0-basierte Indexziffer fuer data-z. */
+    /* DSP-REQ-01: Kern-Sektion — alle vier Kerntemperaturen mit Profilauswahl (id c1..c4) */
+    Buf_Append(&ctx, k_CoreSecOpen, sizeof(k_CoreSecOpen) - 1U);
     for (i = 0U; i < (uint8_t)TEMP_ZONE_COUNT; i++) {
         char zoneIdx0Ch;
-
         zoneCh     = (char)('0' + (char)(i + 1U));
         zoneIdx0Ch = (char)('0' + (char)i);
-
-        Buf_Append(&ctx, k_BlockOpen, sizeof(k_BlockOpen) - 1U);
+        Buf_Append(&ctx, k_BlkOpenA,  sizeof(k_BlkOpenA)  - 1U);
+        Buf_Append(&ctx, "c", 1U);
         Buf_Append(&ctx, &zoneCh, 1U);
-        Buf_Append(&ctx, k_BlockMid, sizeof(k_BlockMid) - 1U);
-
-        /* DSP-REQ-02: Garraum (id "bN") */
-        Html_AppendDisplay(&ctx, 'b', zoneCh,
-                           k_LblGarraum, sizeof(k_LblGarraum) - 1U,
-                           &data->burner[i], false);
-        /* DSP-REQ-03: Kern (id "cN") mit Legende */
-        Html_AppendDisplay(&ctx, 'c', zoneCh,
-                           k_LblKern, sizeof(k_LblKern) - 1U,
-                           &data->core[i], true);
-
-        /* .ds schliessen, dann Per-Zone-Chip-Bar (DSP-REQ-07), dann .bl schliessen */
-        Buf_Append(&ctx, k_DsClose,    sizeof(k_DsClose)    - 1U);
-        Buf_Append(&ctx, k_ZoneProfA,  sizeof(k_ZoneProfA)  - 1U);
+        Buf_Append(&ctx, k_BlkOpenB,  sizeof(k_BlkOpenB)  - 1U);
+        Buf_Append(&ctx, &zoneCh, 1U);
+        Buf_Append(&ctx, k_BlkOpenC,  sizeof(k_BlkOpenC)  - 1U);
+        Html_AppendDisplay(&ctx, &data->core[i], true);
+        Buf_Append(&ctx, k_ZoneProfA, sizeof(k_ZoneProfA) - 1U);
         Buf_Append(&ctx, &zoneIdx0Ch, 1U);
-        Buf_Append(&ctx, k_ZoneProfB,  sizeof(k_ZoneProfB)  - 1U);
-        Buf_Append(&ctx, k_BlockClose, sizeof(k_BlockClose) - 1U);
+        Buf_Append(&ctx, k_ZoneProfB, sizeof(k_ZoneProfB) - 1U);
+        Buf_Append(&ctx, k_BlkClose,  sizeof(k_BlkClose)  - 1U);
     }
-
-    Buf_Append(&ctx, k_GridClose, sizeof(k_GridClose) - 1U);
+    Buf_Append(&ctx, k_SecClose, sizeof(k_SecClose) - 1U);
 
     /* DSP-REQ-06: Gasflaschen-Anzeige zentriert unterhalb des Rasters */
     Html_AppendGas(&ctx, &data->gas);

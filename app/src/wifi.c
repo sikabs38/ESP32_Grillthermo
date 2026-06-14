@@ -15,8 +15,11 @@
 LOG_MODULE_REGISTER(wifi_app, LOG_LEVEL_DBG);
 
 /* WIF-NFR-02: Statisch allozierter Thread-Stack */
-#define WIFI_THREAD_STACK_SIZE (4096U)
-#define WIFI_THREAD_PRIORITY   (5)
+#define WIFI_THREAD_STACK_SIZE  (4096U)
+#define WIFI_THREAD_PRIORITY    (5)
+/* WIF-REQ-07: Verbindungs-Timeout und Wiederholungsintervall */
+#define WIFI_CONNECT_TIMEOUT_S  (60U)
+#define WIFI_RETRY_DELAY_S      (30U)
 
 /* WIF-REQ-01: Semaphor mit Initialwert 1 — loest Verbindungsversuch beim Start aus */
 static K_SEM_DEFINE(g_ReconnectSem, 1, 1);
@@ -74,6 +77,8 @@ static void Wifi_EventCallback(struct net_mgmt_event_callback *cb,
         g_Connected    = false;
         g_CurrentIp[0] = '\0';
         LOG_INF("Verbindung getrennt.");
+        /* WIF-REQ-07: Automatisch neu verbinden */
+        k_sem_give(&g_ReconnectSem);
     }
 }
 
@@ -172,16 +177,22 @@ static void Wifi_Thread(void *p1, void *p2, void *p3)
             continue;
         }
 
-        /* Auf Verbindungsergebnis warten (max. 30 Sekunden) */
-        if (k_sem_take(&g_ConnectResultSem, K_SECONDS(30)) != 0) {
-            LOG_WRN("Verbindung fehlgeschlagen (Timeout).");
+        /* WIF-REQ-07: Auf Verbindungsergebnis warten (max. 60 Sekunden) */
+        if (k_sem_take(&g_ConnectResultSem, K_SECONDS(WIFI_CONNECT_TIMEOUT_S)) != 0) {
+            LOG_WRN("Verbindung fehlgeschlagen (Timeout). Neuer Versuch in %u s.",
+                    WIFI_RETRY_DELAY_S);
+            k_sleep(K_SECONDS(WIFI_RETRY_DELAY_S));
+            k_sem_give(&g_ReconnectSem);
             continue;
         }
 
         if (g_ConnectSuccess) {
             g_Connected = true;
         } else {
-            LOG_WRN("Verbindung fehlgeschlagen.");
+            LOG_WRN("Verbindung fehlgeschlagen. Neuer Versuch in %u s.",
+                    WIFI_RETRY_DELAY_S);
+            k_sleep(K_SECONDS(WIFI_RETRY_DELAY_S));
+            k_sem_give(&g_ReconnectSem);
         }
     }
 }

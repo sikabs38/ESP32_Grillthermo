@@ -208,6 +208,29 @@ Da eine dauerhaft offene SSE-Verbindung (WEB-REQ-06) je Browser einen Client-Slo
 
 ---
 
+### WEB-REQ-10
+
+#### Beschreibung
+
+Die Titelzeile der Webseite soll die Softwareversionsnummer enthalten. Der angezeigte Text lautet `<Hostname> Version X.Y` — der Hostname gefolgt von einem Leerzeichen, dem Wort „Version" und der aktuellen Versionsnummer aus `ESP32_GRILLTHERMO_VERSION_STRING`. Dieser Text erscheint sowohl im HTML-`<title>`-Tag (Browser-Tab) als auch im `<h1>`-Element des sichtbaren Seitenkopfes.
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Niedrig   | Umgesetzt | `app/src/webserver.c:Webserver_BuildHtml()`, `k_VersionSuffix` |
+
+#### Abhängigkeiten
+
+- WEB-REQ-02 (Titelzeile mit Hostname)
+
+#### Abnahmekriterien
+
+- Der Browser-Tab zeigt `<Hostname> Version X.Y`
+- Die sichtbare Überschrift der Seite zeigt `<Hostname> Version X.Y`
+- Der Versionsstring entspricht `ESP32_GRILLTHERMO_VERSION_STRING` aus `version.h`
+- Das Format ist `<net_hostname_get()> Version <ESP32_GRILLTHERMO_VERSION_STRING>` (ein Leerzeichen vor und nach „Version")
+
+---
+
 ## 3. Nicht-funktionale Anforderungen
 
 ### WEB-NFR-01
@@ -288,3 +311,4 @@ Keine.
 | 1.9     | 2026-05-29 |       | WEB-REQ-09 umgesetzt: `col()`-Funktion im JavaScript-Client (`k_HtmlScript`) |
 | 1.10    | 2026-05-29 |       | WEB-REQ-05 und WEB-REQ-09 abgelöst durch DSP-REQ-01..04; SSE-Feld `target` entfernt; WEB-REQ-07 auf `b1`–`b4` / `c1`–`c4` und Implementierungsverweis auf `Html_AppendDisplay()` aktualisiert |
 | 1.11    | 2026-05-29 |       | SSE-Feld `gas` (Einzeleintrag) ergänzt für DSP-REQ-06 |
+| 1.12    | 2026-06-14 |       | WEB-REQ-10 ergänzt: Versionsnummer in Titelzeile (`<Hostname> Version X.Y`) |

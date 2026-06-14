@@ -1,8 +1,9 @@
-/* SHL-REQ-01, SHL-REQ-06, SHL-REQ-07, SHL-REQ-08: Shell, Login, Bootmeldung, Bootloader */
+/* SHL-REQ-01, SHL-REQ-06, SHL-REQ-07, SHL-REQ-08, SHL-REQ-10: Shell, Login, Bootmeldung, Bootloader, Version */
 #include "config.h"
 #include "wifi.h"
 #include "bluetooth.h"
 #include "temp_data.h"
+#include "version.h"
 
 #include <zephyr/kernel.h>
 #include <zephyr/init.h>
@@ -135,6 +136,7 @@ static void Shell_PrintBanner(void)
            "Zephyr OS: " KERNEL_VERSION_STRING "\n"
            "CPU:       ESP32-S3 (Xtensa LX7)\n");
     printk("Takt:      %u MHz\n"
+           "Version:   " ESP32_GRILLTHERMO_VERSION_STRING "\n"
            "-------------------------\n",
            BOOT_CPU_FREQ_MHZ);
 }
@@ -152,6 +154,7 @@ static void Shell_PrintBannerShell(const struct shell *sh)
                   "CPU:       ESP32-S3 (Xtensa LX7)\n");
     shell_fprintf(sh, SHELL_NORMAL,
                   "Takt:      %u MHz\n"
+                  "Version:   " ESP32_GRILLTHERMO_VERSION_STRING "\n"
                   "-------------------------\n",
                   BOOT_CPU_FREQ_MHZ);
 }

@@ -260,6 +260,40 @@ Die Shell soll einen Befehl `wifi status` bereitstellen, der den aktuellen WiFi-
 
 ---
 
+### SHL-REQ-10
+
+#### Beschreibung
+
+Die Bootmeldung (SHL-REQ-07) soll eine zusätzliche Zeile mit der Softwareversionsnummer enthalten. Die Versionsnummer wird zur Build-Zeit aus `app/src/version.h` (`ESP32_GRILLTHERMO_VERSION_STRING`) eingebunden. Das erweiterte Format lautet:
+
+```
+=========================
+=== ESP32 Grillthermo ===
+=== Temperaturmonitor ===
+=========================
+Zephyr OS: <Version>
+CPU:       <CPU-Bezeichnung>
+Takt:      <MHz> MHz
+Version:   X.Y
+-------------------------
+```
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Niedrig   | Umgesetzt | `app/src/shell.c:Shell_PrintBanner()`, `Shell_PrintBannerShell()` |
+
+#### Abhängigkeiten
+
+- SHL-REQ-07 (Bootmeldung mit ASCII-Rahmen und Systeminformationen)
+
+#### Abnahmekriterien
+
+- Die Zeile `Version:   X.Y` erscheint in der Bootmeldung unmittelbar nach der Takt-Zeile
+- Der angezeigte Wert entspricht `ESP32_GRILLTHERMO_VERSION_STRING` aus `version.h`
+- Das Format `Version:   ` (drei Leerzeichen nach dem Doppelpunkt) ist konsistent mit den übrigen Zeilen des Banners
+
+---
+
 ## 3. Nicht-funktionale Anforderungen
 
 ### SHL-NFR-01
@@ -348,3 +382,4 @@ Eine ungültige Eingabe in der Shell darf nicht zum Absturz oder undefinierten V
 | 1.8     | 2026-05-27 |       | SHL-REQ-07 Status auf „Umgesetzt" gesetzt; SHL-REQ-08 überarbeitet: interaktiver `Pin:`-Prompt statt Argument, Status auf „In Bearbeitung" |
 | 1.9     | 2026-05-27 |       | SHL-REQ-02 überarbeitet: Passwort wird interaktiv mit `Passwort:`-Prompt und `*`-Verdeckung abgefragt statt als Argument übergeben |
 | 2.0     | 2026-05-27 |       | SHL-REQ-09 ergänzt: `wifi status`-Befehl zur Anzeige des WiFi-Verbindungsstatus |
+| 2.1     | 2026-06-14 |       | SHL-REQ-10 ergänzt: Softwareversionsnummer in der Bootmeldung |

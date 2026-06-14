@@ -1,6 +1,7 @@
-/* WEB-REQ-01..09, TMP-REQ-02, TMP-REQ-03, DSP-REQ-01..07 */
+/* WEB-REQ-01..10, TMP-REQ-02, TMP-REQ-03, DSP-REQ-01..07 */
 #include "webserver.h"
 #include "temp_data.h"
+#include "version.h"
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -76,6 +77,9 @@ static const char k_HtmlCss[] =
     "<div class=\"hdr\"><h1>";
 
 static const char k_HtmlAfterH1[] = "</h1></div>";
+
+/* WEB-REQ-10: Versionsanhang fuer Titel und H1: " Version X.Y" */
+static const char k_VersionSuffix[] = " Version " ESP32_GRILLTHERMO_VERSION_STRING;
 
 /* DSP-REQ-01: Sektions-Container (Brenner oben, Kern unten) und Block-Fragmente.
  * k_BlkOpenA + Prefix (b/c) + Zonenziffer (1..4) + k_BlkOpenB + Zonenziffer + k_BlkOpenC
@@ -328,11 +332,13 @@ static int Webserver_BuildHtml(const char *hostname, const Temp_Data_t *data)
     uint8_t  i;
     char     zoneCh;
 
-    Buf_Append(&ctx, k_HtmlA,       sizeof(k_HtmlA)       - 1U);
-    Buf_Append(&ctx, hostname,      hLen);
-    Buf_Append(&ctx, k_HtmlCss,     sizeof(k_HtmlCss)     - 1U);
-    Buf_Append(&ctx, hostname,      hLen);
-    Buf_Append(&ctx, k_HtmlAfterH1, sizeof(k_HtmlAfterH1) - 1U);
+    Buf_Append(&ctx, k_HtmlA,        sizeof(k_HtmlA)        - 1U);
+    Buf_Append(&ctx, hostname,       hLen);
+    Buf_Append(&ctx, k_VersionSuffix, sizeof(k_VersionSuffix) - 1U);
+    Buf_Append(&ctx, k_HtmlCss,      sizeof(k_HtmlCss)      - 1U);
+    Buf_Append(&ctx, hostname,       hLen);
+    Buf_Append(&ctx, k_VersionSuffix, sizeof(k_VersionSuffix) - 1U);
+    Buf_Append(&ctx, k_HtmlAfterH1,  sizeof(k_HtmlAfterH1)  - 1U);
 
     /* DSP-REQ-01: Brenner-Sektion — alle vier Garraumtemperaturen (id b1..b4) */
     Buf_Append(&ctx, k_BurnerSecOpen, sizeof(k_BurnerSecOpen) - 1U);

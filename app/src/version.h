@@ -1,0 +1,9 @@
+/* Automatisch generiert von /bump — nicht manuell bearbeiten. */
+#ifndef ESP32_GRILLTHERMO_VERSION_H
+#define ESP32_GRILLTHERMO_VERSION_H
+
+#define ESP32_GRILLTHERMO_VERSION_MAJOR (0)
+#define ESP32_GRILLTHERMO_VERSION_MINOR (1)
+#define ESP32_GRILLTHERMO_VERSION_STRING "0.1"
+
+#endif /* ESP32_GRILLTHERMO_VERSION_H */

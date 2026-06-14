@@ -27,6 +27,11 @@ static K_SEM_DEFINE(g_ReconnectSem, 1, 1);
 /* Semaphor fuer Verbindungsergebnis aus dem Callback an den Thread */
 static K_SEM_DEFINE(g_ConnectResultSem, 0, 1);
 
+/* Einmalige Verbindungs-Meldung fuer Wifi_WaitConnected():
+ * wird gegeben, sobald die erste IP-Verbindung steht; bleibt danach verfuegbar
+ * (max=1 verhindert Ansammlung, take ohne Abgabe durch den Aufrufer ist korrekt). */
+static K_SEM_DEFINE(g_ConnectedOnceSem, 0, 1);
+
 static struct net_mgmt_event_callback g_WifiCb;
 static struct net_mgmt_event_callback g_IpCb;
 
@@ -188,6 +193,8 @@ static void Wifi_Thread(void *p1, void *p2, void *p3)
 
         if (g_ConnectSuccess) {
             g_Connected = true;
+            /* Einmalig signalisieren — wartendes Bluetooth_Thread() kann jetzt starten */
+            (void)k_sem_give(&g_ConnectedOnceSem);
         } else {
             LOG_WRN("Verbindung fehlgeschlagen. Neuer Versuch in %u s.",
                     WIFI_RETRY_DELAY_S);
@@ -209,6 +216,16 @@ K_THREAD_DEFINE(wifi_thread, WIFI_THREAD_STACK_SIZE,
 void Wifi_Reconnect(void)
 {
     (void)k_sem_give(&g_ReconnectSem);
+}
+
+bool Wifi_WaitConnected(k_timeout_t timeout)
+{
+    if (k_sem_take(&g_ConnectedOnceSem, timeout) != 0) {
+        return false;
+    }
+    /* Semaphor direkt zurueckgeben, damit weitere Aufrufer nicht blockieren */
+    (void)k_sem_give(&g_ConnectedOnceSem);
+    return true;
 }
 
 /* WIF-REQ-05 */

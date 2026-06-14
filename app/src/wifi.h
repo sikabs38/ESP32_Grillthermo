@@ -3,6 +3,7 @@
 #define APP_WIFI_H
 
 #include <stdbool.h>
+#include <zephyr/kernel.h>
 #include "config.h"
 
 #define WIFI_IP_ADDR_STR_LEN (16U)
@@ -18,5 +19,10 @@ void Wifi_Reconnect(void);
 
 /* WIF-REQ-05: Aktuellen Verbindungsstatus liefern */
 void Wifi_GetStatus(Wifi_Status_t *status);
+
+/* Blockiert bis zur ersten erfolgreichen WiFi-Verbindung oder Timeout.
+ * Gibt true zurueck wenn verbunden, false bei Timeout.
+ * Gedacht fuer Module, die erst nach WiFi-Verbindung starten sollen (z.B. Bluetooth). */
+bool Wifi_WaitConnected(k_timeout_t timeout);
 
 #endif /* APP_WIFI_H */

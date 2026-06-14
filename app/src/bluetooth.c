@@ -2,6 +2,7 @@
 #include "bluetooth.h"
 #include "config.h"
 #include "temp_data.h"
+#include "wifi.h"
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -22,14 +23,22 @@ LOG_MODULE_REGISTER(bluetooth_app, LOG_LEVEL_INF);
 #define BT_THREAD_STACK_SIZE      (4096U)
 #define BT_THREAD_PRIORITY        (7)
 
-/* BLE-REQ-03: Scan-Timeout (30 s) */
-#define BT_SCAN_TIMEOUT_MS        (30000U)
+/* BLE-REQ-03: Scan-Timeout (60 s — erhoeht wegen reduziertem Scan-Tastverhältnis) */
+#define BT_SCAN_TIMEOUT_MS        (60000U)
 /* BLE-REQ-03: Maximale Anzahl unterschiedlicher Treffer (Dedupe per MAC) */
 #define BT_SCAN_MAX_RESULTS       (16U)
 /* BLE-REQ-08: Wiederverbindungsintervall (10 s) */
 #define BT_RECONNECT_INTERVAL_MS  (10000U)
 /* BLE-REQ-08: Verbindungsaufbau-Timeout — Grill nicht in Reichweite (Einheit 10 ms) */
 #define BT_CONNECT_TIMEOUT_10MS   (3000U)
+
+/* Scan-Parameter: 15 % Tastverhältnis (Intervall 100 ms, Fenster 15 ms).
+ * BT und WiFi teilen auf ESP32-S3 ein Funkmodul; ein Tastverhältnis von 100 %
+ * (BT_GAP_SCAN_FAST_INTERVAL == BT_GAP_SCAN_FAST_WINDOW) blockiert WiFi
+ * vollständig und verhindert den Aufbau der Webanzeige während des Scans.
+ * Einheit: 0,625 ms-Schritte; 160 × 0,625 = 100 ms, 24 × 0,625 = 15 ms. */
+#define BT_SCAN_INTERVAL_UNITS    (160U)
+#define BT_SCAN_WINDOW_UNITS      (24U)
 
 /* BLE-REQ-04..06: Mindest-Payload-Groesse, ab der wir parsen
  * (mindestens bis Ende Gas-Gewicht-Bytes). Kleinere Pakete werden verworfen.
@@ -62,11 +71,13 @@ static struct bt_uuid_128 g_G32TxCharUuid = BT_UUID_INIT_128(
     BT_UUID_128_ENCODE(0xdc0f41e2U, 0xb6aeU, 0x46a8U, 0xa19eU, 0x1a3bf4342bcbULL));
 static struct bt_uuid_16  g_CccUuid = BT_UUID_INIT_16(BT_UUID_GATT_CCC_VAL);
 
-/* BLE-REQ-08: Verbindungsaufbau-Parameter mit Timeout (verhindert unbegrenztes Scannen) */
+/* BLE-REQ-08: Verbindungsaufbau-Parameter mit Timeout (verhindert unbegrenztes Scannen).
+ * Fenster = halbes Intervall (50 % Tastverhältnis) statt 100 %, damit WiFi
+ * waehrend des Connect-Scans weiter Pakete empfangen und senden kann. */
 static const struct bt_conn_le_create_param g_CreateParam = {
     .options        = BT_CONN_LE_OPT_NONE,
     .interval       = BT_GAP_SCAN_FAST_INTERVAL,
-    .window         = BT_GAP_SCAN_FAST_INTERVAL,
+    .window         = BT_GAP_SCAN_FAST_WINDOW,
     .interval_coded = 0U,
     .window_coded   = 0U,
     .timeout        = BT_CONNECT_TIMEOUT_10MS,
@@ -644,6 +655,14 @@ static void Bt_Thread(void *p1, void *p2, void *p3)
     g_BtReady = true;
     LOG_INF("Bluetooth bereit.");
 
+    /* BLE-REQ-08: Erst verbinden wenn WiFi steht — BT und WiFi teilen auf dem
+     * ESP32-S3 ein Funkmodul; simultanes BLE-Scanning waehrend WiFi-Assoziation
+     * verhindert den WLAN-Verbindungsaufbau. Timeout 2 min als Fallback fuer
+     * den Fall, dass kein WLAN konfiguriert ist. */
+    if (!Wifi_WaitConnected(K_SECONDS(120))) {
+        printk("BT: WiFi nicht verbunden (Timeout) — starte trotzdem.\n");
+    }
+
     /* BLE-REQ-08: Beim Start einmal direkt versuchen */
     (void)k_sem_give(&g_ReconnectSem);
 
@@ -692,8 +711,8 @@ int Bluetooth_ScanStart(bool filterByG32)
     struct bt_le_scan_param params = {
         .type     = BT_LE_SCAN_TYPE_ACTIVE,
         .options  = BT_LE_SCAN_OPT_NONE,
-        .interval = BT_GAP_SCAN_FAST_INTERVAL,
-        .window   = BT_GAP_SCAN_FAST_WINDOW,
+        .interval = BT_SCAN_INTERVAL_UNITS,
+        .window   = BT_SCAN_WINDOW_UNITS,
     };
     int rc;
 

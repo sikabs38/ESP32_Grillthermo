@@ -26,7 +26,8 @@ static uint8_t            g_TxBuf[MQTT_TX_BUF_SIZE];
 static struct mqtt_client g_Client;
 /* MISRA 11.4: struct sockaddr_in fuer Broker-Adresse; cast auf const void* fuer MQTT-API noetig */
 static struct sockaddr_in g_BrokerAddr;
-static bool               g_Connected = false;
+static bool               g_TcpActive = false; /* TCP-Verbindung offen (inkl. MQTT-Handshake) */
+static bool               g_Connected = false; /* MQTT CONNACK erfolgreich */
 static char               g_BrokerHostname[CFG_MQTT_BROKER_MAX_LEN + 1U];
 static char               g_ClientId[CFG_WIFI_HOSTNAME_MAX_LEN + 1U];
 static char               g_Password[CFG_MQTT_PASS_MAX_LEN + 1U];
@@ -49,12 +50,15 @@ static void Mqtt_EventCb(struct mqtt_client *client, const struct mqtt_evt *evt)
             g_Connected = true;
             LOG_INF("MQTT verbunden: %s", g_BrokerHostname);
         } else {
-            LOG_WRN("MQTT CONNACK Fehler: %d", evt->result);
+            /* Broker hat Verbindung abgelehnt (z.B. falsche Zugangsdaten) */
+            LOG_WRN("MQTT CONNACK abgelehnt: Code %d", evt->result);
+            g_TcpActive = false;
         }
         break;
 
     case MQTT_EVT_DISCONNECT:
         g_Connected = false;
+        g_TcpActive = false;
         LOG_INF("MQTT getrennt");
         break;
 
@@ -110,7 +114,9 @@ static int Mqtt_DoConnect(void)
     }
 
     rc = mqtt_connect(&g_Client);
-    if (rc != 0) {
+    if (rc == 0) {
+        g_TcpActive = true;
+    } else {
         LOG_ERR("mqtt_connect fehlgeschlagen: %d", rc);
     }
 
@@ -125,12 +131,14 @@ static void Mqtt_RunEventLoop(void)
     fds.events  = ZSOCK_POLLIN;
     fds.revents = 0;
 
-    while (g_Connected) {
+    /* Schleife laeuft solange TCP-Verbindung offen ist — auch waehrend des CONNACK-Wartens */
+    while (g_TcpActive) {
         fds.fd = g_Client.transport.tcp.sock;
 
         rc = zsock_poll(&fds, 1, MQTT_POLL_TIMEOUT_MS);
         if (rc < 0) {
             LOG_ERR("poll-Fehler: %d", rc);
+            g_TcpActive = false;
             break;
         }
 
@@ -138,6 +146,7 @@ static void Mqtt_RunEventLoop(void)
             rc = mqtt_input(&g_Client);
             if (rc != 0) {
                 LOG_ERR("mqtt_input-Fehler: %d", rc);
+                g_TcpActive = false;
                 break;
             }
         }
@@ -145,6 +154,7 @@ static void Mqtt_RunEventLoop(void)
         rc = mqtt_live(&g_Client);
         if ((rc != 0) && (rc != -EAGAIN)) {
             LOG_ERR("mqtt_live-Fehler: %d", rc);
+            g_TcpActive = false;
             break;
         }
     }
@@ -192,6 +202,7 @@ static void Mqtt_Thread(void *p1, void *p2, void *p3)
             mqtt_abort(&g_Client);
         }
 
+        g_TcpActive = false;
         g_Connected = false;
 
         /* MQT-REQ-01: 30 s warten; Mqtt_Reconnect() kann die Wartezeit verkuerzen */

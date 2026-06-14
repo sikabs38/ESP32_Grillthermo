@@ -26,10 +26,12 @@ typedef struct {
     char     wifiPassword[CFG_WIFI_PASS_MAX_LEN + 1U]; /* TODO: CFG-REQ-05 AES */
     char     wifiHostname[CFG_WIFI_HOSTNAME_MAX_LEN + 1U]; /* WIF-REQ-06 */
     char     mqttBroker[CFG_MQTT_BROKER_MAX_LEN + 1U];
-    char     mqttPassword[CFG_MQTT_PASS_MAX_LEN + 1U];
     uint16_t mqttPort;
     char     pin[CFG_PIN_BUF_SIZE];                    /* TODO: CFG-REQ-05 AES */
     char     grillMac[CFG_GRILL_MAC_BUF_SIZE];         /* BLE-REQ-07 */
+    /* Felder, die nach einer Struct-Erweiterung hinzugefuegt wurden, werden ans Ende
+     * gestellt, damit aeltere NVS-Datensaetze rueckwaertskompatibel lesbar bleiben. */
+    char     mqttPassword[CFG_MQTT_PASS_MAX_LEN + 1U];
 } Config_Data_t;
 
 int  Config_Init(void);

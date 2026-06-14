@@ -104,9 +104,40 @@ int Config_Load(Config_Data_t *data)
         id = (uint16_t)(NVS_ID_BASE + i);
         rc = nvs_read(&g_NvsFs, id, &records[i], sizeof(Config_Record_t));
 
-        if ((rc != (ssize_t)sizeof(Config_Record_t)) && (rc != -ENOENT)) {
-            /* CFG-NFR-03: Lesefehler loggen; Eintrag bleibt null-initialisiert (ungueltig) */
+        if (rc == (ssize_t)sizeof(Config_Record_t)) {
+            /* Vollstaendiger Datensatz — keine Aktion noetig */
+        } else if ((rc > (ssize_t)sizeof(uint32_t)) &&
+                   (rc < (ssize_t)sizeof(Config_Record_t))) {
+            /* Partieller Datensatz: aeltere Firmware-Version mit kleinerem Struct.
+             * Die neuen Felder liegen am Ende und sind durch memset null-initialisiert.
+             * Altes CRC liegt in den letzten 4 Bytes des gespeicherten Datensatzes. */
+            /* MISRA 11.3: uint8_t*-Cast unvermeidlich fuer Byte-weisen CRC-Zugriff */
+            const uint8_t *rawPtr     = (const uint8_t *)&records[i];
+            size_t         storedSize = (size_t)rc;
+            uint32_t       oldCrc     = 0U;
+            uint32_t       compCrc;
+
+            (void)memcpy(&oldCrc, rawPtr + storedSize - sizeof(uint32_t),
+                         sizeof(uint32_t));
+            compCrc = crc32_ieee(rawPtr, storedSize - sizeof(uint32_t));
+
+            if (records[i].valid && (oldCrc == compCrc)) {
+                /* Gueltig: CRC fuer neues Layout (incl. null-initialisierter Felder)
+                 * neuberechnen, damit Config_FindNewest den Eintrag akzeptiert. */
+                records[i].crc = Config_ComputeCrc(&records[i]);
+                LOG_INF("NVS-Slot %u: Datensatz migriert (%u -> %u Byte).",
+                        (unsigned int)id, (unsigned int)storedSize,
+                        (unsigned int)sizeof(Config_Record_t));
+            } else {
+                (void)memset(&records[i], 0, sizeof(Config_Record_t));
+                LOG_WRN("NVS-Slot %u: Datensatz nach Upgrade ungueltig; Standardwerte.",
+                        (unsigned int)id);
+            }
+        } else if (rc != -ENOENT) {
+            /* CFG-NFR-03: Echter Lesefehler loggen */
             LOG_ERR("NVS-Lesefehler Slot %u: %d", (unsigned int)id, (int)rc);
+        } else {
+            /* -ENOENT: Slot leer — Eintrag bleibt null-initialisiert (ungueltig) */
         }
     }
 

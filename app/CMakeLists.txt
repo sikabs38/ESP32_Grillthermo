@@ -13,6 +13,7 @@ target_sources(app PRIVATE
     src/temp_data.c
     src/bluetooth.c
     src/coex_printf.c
+    src/mqtt.c
 )
 
 zephyr_linker_sources(SECTIONS sections-rom.ld)

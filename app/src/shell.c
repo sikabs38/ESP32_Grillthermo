@@ -2,6 +2,7 @@
 #include "config.h"
 #include "wifi.h"
 #include "bluetooth.h"
+#include "mqtt.h"
 #include "temp_data.h"
 #include "version.h"
 
@@ -56,6 +57,10 @@ static char   g_WifiPassBuf[CFG_WIFI_PASS_MAX_LEN + 1U];
 static size_t g_WifiPassBufLen = 0U;
 /* WIF-REQ-06: Hostname */
 static char   g_WifiHostnameBuf[CFG_WIFI_HOSTNAME_MAX_LEN + 1U];
+/* MQT-REQ-02: Zwischenspeicher fuer Broker; Passworteingabe-Puffer im MQTT-Bypass */
+static char   g_MqttBrokerStaging[CFG_MQTT_BROKER_MAX_LEN + 1U];
+static char   g_MqttPassBuf[CFG_MQTT_PASS_MAX_LEN + 1U];
+static size_t g_MqttPassBufLen = 0U;
 
 /* ------------------------------------------------------------------ */
 /* Hilfsfunktionen                                                     */
@@ -414,21 +419,83 @@ static int Shell_CmdWifiHostname(const struct shell *sh, size_t argc, char **arg
 }
 
 /* ------------------------------------------------------------------ */
-/* mqtt                                                   SHL-REQ-03  */
+/* mqtt set — Passwort-Bypass                             MQT-REQ-02  */
+/* ------------------------------------------------------------------ */
+
+/* MQT-REQ-02: Bypass-Callback — nimmt MQTT-Passwort verdeckt entgegen. */
+static void Shell_MqttPasswordBypass(const struct shell *sh, uint8_t *data,
+                                     size_t len, void *user_data)
+{
+    int    rc;
+    size_t i;
+
+    ARG_UNUSED(user_data);
+
+    for (i = 0U; i < len; i++) {
+        uint8_t c = data[i];
+
+        if ((c == (uint8_t)'\r') || (c == (uint8_t)'\n')) {
+            g_MqttPassBuf[g_MqttPassBufLen] = '\0';
+            shell_fprintf(sh, SHELL_NORMAL, "\n");
+
+            if (g_MqttPassBufLen > CFG_MQTT_PASS_MAX_LEN) {
+                shell_error(sh, "Passwort zu lang (max. %u Zeichen).",
+                            (unsigned int)CFG_MQTT_PASS_MAX_LEN);
+                g_MqttPassBufLen = 0U;
+                g_MqttPassBuf[0] = '\0';
+                shell_fprintf(sh, SHELL_NORMAL, "Passwort: ");
+                return;
+            }
+
+            /* Broker und Passwort in Konfiguration uebernehmen */
+            (void)strncpy(g_Config.mqttBroker, g_MqttBrokerStaging, CFG_MQTT_BROKER_MAX_LEN);
+            g_Config.mqttBroker[CFG_MQTT_BROKER_MAX_LEN] = '\0';
+            (void)strncpy(g_Config.mqttPassword, g_MqttPassBuf, CFG_MQTT_PASS_MAX_LEN);
+            g_Config.mqttPassword[CFG_MQTT_PASS_MAX_LEN] = '\0';
+
+            rc = Config_Save(&g_Config);
+
+            g_MqttPassBufLen = 0U;
+            g_MqttPassBuf[0] = '\0';
+            (void)shell_obscure_set(sh, false);
+            shell_set_bypass(sh, NULL, NULL);
+
+            if (rc < 0) {
+                shell_error(sh, "Speicherfehler: %d", rc);
+            } else {
+                shell_print(sh, "MQTT Broker gesetzt: %s", g_Config.mqttBroker);
+                Mqtt_Reconnect();
+            }
+
+            return;
+
+        } else if ((c == (uint8_t)'\b') || (c == 0x7fU)) {
+            if (g_MqttPassBufLen > 0U) {
+                g_MqttPassBufLen--;
+                shell_fprintf(sh, SHELL_NORMAL, "\b \b");
+            }
+        } else if (g_MqttPassBufLen < CFG_MQTT_PASS_MAX_LEN) {
+            g_MqttPassBuf[g_MqttPassBufLen] = (char)c;
+            g_MqttPassBufLen++;
+            shell_fprintf(sh, SHELL_NORMAL, "*");
+        } else {
+            /* Puffer voll (64 Zeichen); Zeichen ignorieren */
+        }
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* mqtt                                                   MQT-REQ-02  */
 /* ------------------------------------------------------------------ */
 
 static int Shell_CmdMqttSet(const struct shell *sh, size_t argc, char **argv)
 {
-    unsigned long portLong;
-    char         *endPtr = NULL;
-    int           rc;
-
     if (!Shell_CheckAuth(sh)) {
         return -EACCES;
     }
 
-    if (argc != 3) {
-        shell_error(sh, "Verwendung: mqtt set <broker> <port>");
+    if (argc != 2) {
+        shell_error(sh, "Verwendung: mqtt set <broker>");
         return -EINVAL;
     }
 
@@ -438,26 +505,42 @@ static int Shell_CmdMqttSet(const struct shell *sh, size_t argc, char **argv)
         return -EINVAL;
     }
 
-    portLong = strtoul(argv[2], &endPtr, 10);
+    /* Broker zwischenspeichern; Passwort wird im Bypass abgefragt */
+    (void)strncpy(g_MqttBrokerStaging, argv[1], CFG_MQTT_BROKER_MAX_LEN);
+    g_MqttBrokerStaging[CFG_MQTT_BROKER_MAX_LEN] = '\0';
 
-    if ((endPtr == argv[2]) || (*endPtr != '\0') || (portLong == 0UL) || (portLong > 65535UL)) {
-        shell_error(sh, "Ungueltiger Port (1-65535).");
-        return -EINVAL;
+    g_MqttPassBufLen = 0U;
+    g_MqttPassBuf[0] = '\0';
+    (void)shell_obscure_set(sh, true);
+    shell_set_bypass(sh, Shell_MqttPasswordBypass, NULL);
+    shell_fprintf(sh, SHELL_NORMAL, "Passwort: ");
+
+    return 0;
+}
+
+/* MQT-REQ-04: mqtt status */
+static int Shell_CmdMqttStatus(const struct shell *sh, size_t argc, char **argv)
+{
+    Mqtt_Status_t status;
+
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+
+    if (!Shell_CheckAuth(sh)) {
+        return -EACCES;
     }
 
-    (void)strncpy(g_Config.mqttBroker, argv[1], CFG_MQTT_BROKER_MAX_LEN);
-    g_Config.mqttBroker[CFG_MQTT_BROKER_MAX_LEN] = '\0';
-    g_Config.mqttPort = (uint16_t)portLong;
+    Mqtt_GetStatus(&status);
 
-    rc = Config_Save(&g_Config);
-
-    if (rc < 0) {
-        shell_error(sh, "Speicherfehler: %d", rc);
-        return rc;
+    if (status.connected) {
+        shell_print(sh, "MQTT Status  : Verbunden");
+        shell_print(sh, "Broker       : %s", status.broker);
+    } else {
+        shell_print(sh, "MQTT Status  : Getrennt");
+        if (status.broker[0] != '\0') {
+            shell_print(sh, "Broker       : %s", status.broker);
+        }
     }
-
-    shell_print(sh, "MQTT Broker gesetzt: %s:%u",
-                g_Config.mqttBroker, (unsigned int)g_Config.mqttPort);
 
     return 0;
 }
@@ -484,7 +567,9 @@ static int Shell_CmdConfigShow(const struct shell *sh, size_t argc, char **argv)
                 (g_Config.wifiHostname[0] != '\0') ? g_Config.wifiHostname : "[nicht gesetzt]");
     shell_print(sh, "MQTT Broker  : %s",
                 (g_Config.mqttBroker[0] != '\0') ? g_Config.mqttBroker : "[nicht gesetzt]");
-    shell_print(sh, "MQTT Port    : %u", (unsigned int)g_Config.mqttPort);
+    /* MQT-REQ-02: Passwort nie im Klartext ausgeben */
+    shell_print(sh, "MQTT Passwort: %s",
+                (g_Config.mqttPassword[0] != '\0') ? "********" : "[nicht gesetzt]");
     /* BLE-REQ-07: Grill-MAC im config-show ausgeben */
     shell_print(sh, "Grill MAC    : %s",
                 (g_Config.grillMac[0] != '\0') ? g_Config.grillMac : "[nicht gesetzt]");
@@ -852,7 +937,8 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_wifi,
 );
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_mqtt,
-    SHELL_CMD_ARG(set, NULL, "MQTT konfigurieren: <broker> <port>", Shell_CmdMqttSet, 3, 0),
+    SHELL_CMD_ARG(set,    NULL, "MQTT konfigurieren: <broker>", Shell_CmdMqttSet,    2, 0),
+    SHELL_CMD(    status, NULL, "MQTT-Status anzeigen",         Shell_CmdMqttStatus),
     SHELL_SUBCMD_SET_END
 );
 

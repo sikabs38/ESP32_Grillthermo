@@ -61,23 +61,11 @@ Die Shell soll die Konfiguration der WiFi-Zugangsdaten (SSID und Passwort) ermö
 
 ### SHL-REQ-03
 
-#### Beschreibung
-
-Die Shell soll die Konfiguration des MQTT-Brokers (Hostname und Port) ermöglichen.
+> **Abgelöst durch MQT-REQ-02** (siehe `doc/requirements/mqtt.md`). Der Befehl `mqtt set <broker> <port>` entfällt; an seine Stelle tritt `mqtt set <broker>` mit interaktivem Passwort-Prompt und festem Port 1883.
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Umgesetzt | `app/src/shell.c:Shell_CmdMqttSet()` |
-
-#### Abhängigkeiten
-
-- SHL-REQ-01 (Shell über USB)
-
-#### Abnahmekriterien
-
-- Der Befehl `mqtt set <broker> <port>` wird akzeptiert
-- Ungültige Port-Angaben (nicht numerisch, außerhalb 1–65535) werden abgewiesen
-- Die gespeicherten Broker-Daten werden beim nächsten Start verwendet
+| Hoch      | Abgelöst | — (ersetzt durch MQT-REQ-02) |
 
 ---
 
@@ -383,3 +371,4 @@ Eine ungültige Eingabe in der Shell darf nicht zum Absturz oder undefinierten V
 | 1.9     | 2026-05-27 |       | SHL-REQ-02 überarbeitet: Passwort wird interaktiv mit `Passwort:`-Prompt und `*`-Verdeckung abgefragt statt als Argument übergeben |
 | 2.0     | 2026-05-27 |       | SHL-REQ-09 ergänzt: `wifi status`-Befehl zur Anzeige des WiFi-Verbindungsstatus |
 | 2.1     | 2026-06-14 |       | SHL-REQ-10 ergänzt: Softwareversionsnummer in der Bootmeldung |
+| 2.2     | 2026-06-14 |       | SHL-REQ-03 als abgelöst markiert: ersetzt durch MQT-REQ-02 (mqtt.md) |

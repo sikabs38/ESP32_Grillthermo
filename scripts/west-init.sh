@@ -36,7 +36,7 @@ else
 fi
 # shellcheck source=/dev/null
 source "$VENV_DIR/bin/activate"
-pip install --quiet west
+pip install --quiet west esptool
 
 # 2) Workspace initialisieren (nur, falls noch kein .west existiert).
 #    'west init -l' setzt den Topdir auf das Elternverzeichnis des Repos.

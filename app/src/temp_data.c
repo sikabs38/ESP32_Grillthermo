@@ -11,14 +11,13 @@ K_CONDVAR_DEFINE(g_TempCondvar);
 uint32_t g_TempGen = 0U;
 
 /* TMP-REQ-01: Globale Temperaturdaten mit Initialisierungswerten.
- * Brenner: 20 °C / valid, Kern: 0 °C / ungueltig (→ Anzeige "--"),
- * DSP-REQ-06: Gas: 0 % / ungueltig (→ Anzeige "--"). */
+ * Alle Werte ungueltig (→ Anzeige "--") bis die erste BT-Verbindung steht. */
 Temp_Data_t g_TempData = {
     .burner = {
-        { .value = (int16_t)20, .valid = true  },
-        { .value = (int16_t)20, .valid = true  },
-        { .value = (int16_t)20, .valid = true  },
-        { .value = (int16_t)20, .valid = true  },
+        { .value = (int16_t)0, .valid = false },
+        { .value = (int16_t)0, .valid = false },
+        { .value = (int16_t)0, .valid = false },
+        { .value = (int16_t)0, .valid = false },
     },
     .core = {
         { .value = (int16_t)0, .valid = false },

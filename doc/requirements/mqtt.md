@@ -94,18 +94,20 @@ Beispiele:
 
 Der Payload ist ein ganzzahliger ASCII-Dezimalwert ohne Einheit (z.B. `"237"` oder `"74"`). Ungültige Werte (`valid = false`) werden nicht veröffentlicht.
 
+Das Publish-Intervall beträgt 10 Sekunden: alle 10 Sekunden werden alle aktuell gültigen Messwerte veröffentlicht, unabhängig davon ob sich Werte geändert haben.
+
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Offen  |                 |
+| Hoch      | In Bearbeitung | `app/src/mqtt.c:Mqtt_PublishThread()`, `app/src/mqtt.c:Mqtt_PublishSnapshot()`, `app/src/mqtt.c:Mqtt_PublishValue()`; Publish-Intervall noch auf Änderungsgetrieben — Umstellung auf 10-Sekunden-Takt ausstehend |
 
 #### Abhängigkeiten
 
 - MQT-REQ-01 (MQTT-Verbindung muss aufgebaut sein)
-- TMP-REQ-03 (Änderungssignal des Temperaturdaten-Moduls)
+- TMP-REQ-03 (Temperaturdaten-Modul als Datenquelle)
 
 #### Abnahmekriterien
 
-- Bei jeder Wertänderung (gültiger Messwert) wird der zugehörige Topic veröffentlicht
+- Alle gültigen Messwerte werden alle 10 Sekunden veröffentlicht
 - Der Payload enthält den Messwert als ASCII-Dezimalzahl ohne Einheit und ohne Leerzeichen
 - Ungültige Werte (`valid = false`) werden nicht veröffentlicht — der Topic bleibt stumm
 - Topics für alle vier Brennerzonen (`burner/1/` bis `burner/4/`) werden unabhängig voneinander veröffentlicht
@@ -208,3 +210,4 @@ Keine.
 |---------|------------|-------|----------|
 | 1.0     | 2026-06-14 |       | Erstellt: MQT-REQ-01..04 (Verbindungsaufbau, Shell-Konfiguration, Topic-Format, Status) |
 | 1.1     | 2026-06-15 |       | Status-Update: MQT-REQ-01, MQT-REQ-02, MQT-REQ-04, MQT-NFR-02 → Umgesetzt (Commits 2bcd354, 9269aec) |
+| 1.2     | 2026-06-15 |       | MQT-REQ-03: Publish-Intervall 10 Sekunden ergänzt; Status → In Bearbeitung |

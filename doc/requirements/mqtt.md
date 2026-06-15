@@ -98,7 +98,7 @@ Das Publish-Intervall beträgt 10 Sekunden: alle 10 Sekunden werden alle aktuell
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | In Bearbeitung | `app/src/mqtt.c:Mqtt_PublishThread()`, `app/src/mqtt.c:Mqtt_PublishSnapshot()`, `app/src/mqtt.c:Mqtt_PublishValue()`; Publish-Intervall noch auf Änderungsgetrieben — Umstellung auf 10-Sekunden-Takt ausstehend |
+| Hoch      | Umgesetzt | `app/src/mqtt.c:Mqtt_PublishThread()` — 10-Sekunden-Takt via `k_sleep(K_SECONDS(MQTT_PUBLISH_INTERVAL_S))`; `Mqtt_PublishSnapshot()`, `Mqtt_PublishValue()` |
 
 #### Abhängigkeiten
 
@@ -211,3 +211,4 @@ Keine.
 | 1.0     | 2026-06-14 |       | Erstellt: MQT-REQ-01..04 (Verbindungsaufbau, Shell-Konfiguration, Topic-Format, Status) |
 | 1.1     | 2026-06-15 |       | Status-Update: MQT-REQ-01, MQT-REQ-02, MQT-REQ-04, MQT-NFR-02 → Umgesetzt (Commits 2bcd354, 9269aec) |
 | 1.2     | 2026-06-15 |       | MQT-REQ-03: Publish-Intervall 10 Sekunden ergänzt; Status → In Bearbeitung |
+| 1.3     | 2026-06-15 |       | MQT-REQ-03: 10-Sekunden-Takt implementiert; Status → Umgesetzt |

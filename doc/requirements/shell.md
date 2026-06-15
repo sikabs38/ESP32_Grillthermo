@@ -313,7 +313,7 @@ Die Shell soll ausschließlich statischen Speicher verwenden. Dynamische Speiche
 
 | Priorität | Kategorie    | Status | Implementierung |
 |-----------|--------------|--------|-----------------|
-| Hoch      | Zuverlässigkeit | Offen |                |
+| Hoch      | Zuverlässigkeit | Umgesetzt | `app/src/shell.c` — kein `malloc`/`free`; alle Puffer statisch (z.B. `g_Pin`, Bypass-Eingabepuffer `g_Buf`); Puffergrößen als `CFG_*_MAX_LEN`-Konstanten |
 
 #### Abhängigkeiten
 
@@ -334,7 +334,7 @@ Eine ungültige Eingabe in der Shell darf nicht zum Absturz oder undefinierten V
 
 | Priorität | Kategorie    | Status | Implementierung |
 |-----------|--------------|--------|-----------------|
-| Hoch      | Zuverlässigkeit | Offen |                |
+| Hoch      | Zuverlässigkeit | Umgesetzt | `app/src/shell.c` — Längenpruefung in allen Bypass-Callbacks gegen `CFG_WIFI_PASS_MAX_LEN`, `CFG_WIFI_SSID_MAX_LEN`, `CFG_MQTT_PASS_MAX_LEN` etc.; Zephyr-Shell verarbeitet ungültige Befehle ohne Reset |
 
 #### Abhängigkeiten
 
@@ -372,3 +372,4 @@ Eine ungültige Eingabe in der Shell darf nicht zum Absturz oder undefinierten V
 | 2.0     | 2026-05-27 |       | SHL-REQ-09 ergänzt: `wifi status`-Befehl zur Anzeige des WiFi-Verbindungsstatus |
 | 2.1     | 2026-06-14 |       | SHL-REQ-10 ergänzt: Softwareversionsnummer in der Bootmeldung |
 | 2.2     | 2026-06-14 |       | SHL-REQ-03 als abgelöst markiert: ersetzt durch MQT-REQ-02 (mqtt.md) |
+| 2.3     | 2026-06-15 |       | Status-Update: SHL-NFR-02, SHL-NFR-03 → Umgesetzt |

@@ -74,7 +74,7 @@ Das Bluetooth-Modul soll beim Systemstart den Zephyr-Bluetooth-Stack als BLE-Cen
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Offen  |                 |
+| Hoch      | Umgesetzt | `app/src/bluetooth.c:Bt_Thread()` (Zeile 650): `bt_enable(NULL)`; Fehler via `LOG_ERR`; übrige Module unberührt da eigenem Thread |
 
 #### Abhängigkeiten
 
@@ -97,7 +97,7 @@ Das Bluetooth-Modul soll in einem eigenen Zephyr-Thread laufen. Der Thread verwa
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Offen  |                 |
+| Hoch      | Umgesetzt | `app/src/bluetooth.c`: `K_THREAD_DEFINE(bluetooth_thread, BT_THREAD_STACK_SIZE, Bt_Thread, …)` (Zeile 701); Stack 4096 Byte, Priorität 7 |
 
 #### Abhängigkeiten
 
@@ -130,7 +130,7 @@ Alle Befehle sind nur im eingeloggten Zustand ausführbar (SHL-REQ-06).
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Offen  |                 |
+| Hoch      | Umgesetzt | `app/src/shell.c:Shell_CmdBtScan()` (Zeile 1060), `Shell_CmdBtPair()` (Zeile 1098), `Shell_CmdBtUnpair()` (Zeile 1130), `Shell_CmdBtStatus()` (Zeile 1159); G32-Filter via `Bluetooth_ScanStart(true/false)` |
 
 #### Abhängigkeiten
 
@@ -162,7 +162,7 @@ Das Bluetooth-Modul soll die vier Brennertemperaturen (Garraumtemperaturen) des 
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Offen  |                 |
+| Hoch      | Umgesetzt | `app/src/bluetooth.c:Bt_ParseAndDispatch()` (Zeile 282–315): Dekodierung via `Bt_DecodeTemp()`, Sentinel ≥ 1500 via `Bt_IsTempSentinel()`, Plausibilitätsprüfung 0..500 °C; Invalidierung bei Disconnect in `Bt_InvalidateAllValues()` |
 
 #### Abhängigkeiten
 
@@ -190,7 +190,7 @@ Das Bluetooth-Modul soll die vier Kerntemperaturen aus den am Grill angeschlosse
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Offen  |                 |
+| Hoch      | Umgesetzt | `app/src/bluetooth.c:Bt_ParseAndDispatch()` (Zeile 289–326): Sentinel → `Temp_Set(..., false)`, Plausibilitätsprüfung 0..150 °C; Invalidierung in `Bt_InvalidateAllValues()` |
 
 #### Abhängigkeiten
 
@@ -218,7 +218,7 @@ Das Bluetooth-Modul soll den Füllstand der Gasflasche aus den Notify-Paketen pa
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Offen  |                 |
+| Hoch      | Umgesetzt | `app/src/bluetooth.c:Bt_ParseAndDispatch()` (Zeile 296–344): Gramm + Prozent-Byte, Plausibilitätsprüfung (Percent=0 ∧ Grams=0 → invalid), Begrenzung auf 0..100, `Temp_SetGas()` |
 
 #### Abhängigkeiten
 
@@ -249,7 +249,7 @@ Die MAC-Adresse wird als zusätzliches Feld in `Config_Data_t` aufgenommen und f
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Offen  |                 |
+| Hoch      | Umgesetzt | `app/src/config.h:Config_Data_t.grillMac`; `app/src/shell.c:Shell_CmdBtPair()` (Zeile 1114–1117): speichert via `Config_Save()`; `Shell_CmdBtUnpair()` (Zeile 1146–1147): löscht und speichert |
 
 #### Abhängigkeiten
 
@@ -278,7 +278,7 @@ Beim Systemstart soll das Bluetooth-Modul automatisch eine Verbindung mit dem Gr
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Offen  |                 |
+| Hoch      | Umgesetzt | `app/src/bluetooth.c:Bt_Thread()` (Zeile 669–698): liest `grillMac`, ruft `Bt_DoConnect()`; `g_ReconnectSem` für Reconnect; Intervall 10 s; wartet auf WiFi via `Wifi_WaitConnected()` (Zeile 662); `Bt_DisconnectedCb()` gibt Semaphor frei |
 
 #### Abhängigkeiten
 
@@ -305,7 +305,7 @@ Das Bluetooth-Modul soll Statusmeldungen über den Verbindungs- und Kopplungszus
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Mittel    | Offen  |                 |
+| Mittel    | Umgesetzt | `app/src/bluetooth.c`: `printk("BT: Scan gestartet...")` (Zeile 736), `"BT: Scan beendet."` (Zeile 755), `"BT: Verbinde mit %s..."` (Zeile 615), `"BT: Verbunden mit %s."` (Zeile 426), `"BT: Verbindung getrennt..."` (Zeile 481), `"BT: Verbindung fehlgeschlagen..."` (Zeile 455) |
 
 #### Abhängigkeiten
 
@@ -331,7 +331,7 @@ Das Bluetooth-Modul soll eine API bereitstellen, über die andere Module (Shell,
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Mittel    | Offen  |                 |
+| Mittel    | Umgesetzt | `app/src/bluetooth.h:Bluetooth_Status_t` (`connected`, `paired`, `peerMac`, `lastPacketUptimeMs`); `app/src/bluetooth.c:Bluetooth_GetStatus()` (Zeile 786), thread-sicher via `g_StateMutex`; `Shell_CmdBtStatus()` in `shell.c` |
 
 #### Abhängigkeiten
 
@@ -381,7 +381,7 @@ Das Bluetooth-Modul soll ausschließlich statischen Speicher verwenden. Dynamisc
 
 | Priorität | Kategorie       | Status | Implementierung |
 |-----------|-----------------|--------|-----------------|
-| Hoch      | Zuverlässigkeit | Offen  |                 |
+| Hoch      | Zuverlässigkeit | Umgesetzt | `app/src/bluetooth.c` — kein `malloc`/`free`; `K_THREAD_DEFINE` mit `BT_THREAD_STACK_SIZE = 4096` (Zeile 23, 701); statische Puffer `g_ScanSeen[16]`, `g_DiscoverParams`, `g_SubscribeParams` |
 
 #### Abhängigkeiten
 
@@ -403,7 +403,7 @@ Die Bluetooth-Implementierung soll ausschließlich die Zephyr-BLE-API (`zephyr/b
 
 | Priorität | Kategorie   | Status | Implementierung |
 |-----------|-------------|--------|-----------------|
-| Hoch      | Wartbarkeit | Offen  |                 |
+| Hoch      | Wartbarkeit | Umgesetzt | `app/src/bluetooth.c` — ausschließlich `zephyr/bluetooth/{bluetooth,hci,conn,uuid,gatt}.h`; kein ESP-IDF-Zugriff; MAC-Persistenz über `Config_Save()` |
 
 #### Abhängigkeiten
 
@@ -425,7 +425,7 @@ Ein Verbindungsverlust oder ein fehlerhaftes Notify-Paket darf nicht zum Absturz
 
 | Priorität | Kategorie       | Status | Implementierung |
 |-----------|-----------------|--------|-----------------|
-| Hoch      | Zuverlässigkeit | Offen  |                 |
+| Hoch      | Zuverlässigkeit | Umgesetzt | `app/src/bluetooth.c:Bt_ParseAndDispatch()`: Längenprüfung `length < BT_NOTIFY_MIN_LEN` (Zeile 277), Plausibilitätsprüfungen ohne System-Reset; `Bt_DisconnectedCb()`: graceful disconnect + Reconnect via Semaphor |
 
 #### Abhängigkeiten
 
@@ -445,7 +445,7 @@ Ein Verbindungsverlust oder ein fehlerhaftes Notify-Paket darf nicht zum Absturz
 - [x] **Pairing-Variante**: Der G32 erzwingt kein SMP-Pairing — Connect + Notify-Subscribe genügen (Abschnitt 2.4). `CONFIG_BT_SMP` bleibt deaktiviert.
 - [ ] **BLE-Byte-Offset gegenüber TCP-Layout**: Die in Abschnitt 2.2 angegebenen BLE-Indizes sind aus dem TCP-Layout abgeleitet (TCP-Header `a33a` + 4 Byte Meta entfernt). Vor Inbetriebnahme mit nRF Connect / Wireshark verifizieren; bei Abweichung die Offset-Konstanten im Code anpassen.
 - [ ] **Optionale RX-Charakteristik** (`dc0f41e1-…`): Schreibrichtung (z. B. zum Setzen von Alarmen am Grill) ist für diese Firmware nicht erforderlich. Sollte sie später benötigt werden, ist das Schreibformat ebenfalls zu reverse-engineeren.
-- [ ] **Koexistenz BT + WiFi**: In `app/prj.conf` ist Bluetooth derzeit deaktiviert wegen eines Build-Bugs in Zephyr 4.4.0-rc1 (`coexist_printf` fehlt im HAL CMakeLists, wenn BT und WiFi gleichzeitig aktiv sind). Vor Beginn der Implementierung muss geprüft werden, ob ein Update auf eine neuere Zephyr-Version oder ein Workaround verfügbar ist.
+- [x] **Koexistenz BT + WiFi**: Gelöst via `app/src/coex_printf.c` (Workaround für fehlende `coexist_printf`-Funktion im HAL); BLE wartet auf WiFi-Verbindung via `Wifi_WaitConnected()` und nutzt reduziertes Scan-Tastverhältnis (15 %, `BT_SCAN_INTERVAL_UNITS=160`/`BT_SCAN_WINDOW_UNITS=24`).
 - [ ] **Update-Rate des Grills**: Die typische Notify-Rate des G32 (vermutet 1 Hz) ist nicht offiziell dokumentiert. Beobachten und ggf. die Mindest-Aktualisierungsraten in BLE-REQ-04..06 anpassen.
 - [ ] **Maximale Anzahl Bonds**: Vorerst wird nur ein Grill pro Gerät unterstützt. Da kein SMP-Bond verwendet wird, ist die Beschränkung allein durch das Feld `grillMac` in `Config_Data_t` (BLE-REQ-07) gegeben. Eine spätere Erweiterung auf mehrere Grills ist offen.
 
@@ -470,3 +470,4 @@ Die Angaben in Abschnitt 2 stammen aus folgenden Community-Projekten:
 |---------|------------|-------|----------|
 | 1.0     | 2026-05-30 |       | Erstellt: BLE-REQ-01..10, BLE-NFR-01..04 — Bluetooth-Kommunikation mit Otto Wilde G32 (Pairing über Shell, Brenner-/Kerntemperaturen, Gasfüllstand, persistente Kopplung mit Auto-Connect) |
 | 1.1     | 2026-05-30 |       | Abschnitt 2 „Bekanntes Protokoll" ergänzt (GATT-UUIDs, Byte-Layout, Sentinel) auf Basis Community-Reverse-Engineering; BLE-REQ-03 mit Service-/Name-Filter präzisiert; BLE-REQ-04..06 mit konkreten Byte-Indizes und Sentinel-Behandlung ergänzt; BLE-REQ-07 von SMP-Bond-Persistenz auf MAC-Binding in `Config_Data_t` umgestellt; BLE-NFR-03 entsprechend angepasst (`CONFIG_BT_SETTINGS=n`, `CONFIG_BT_SMP=n`); Offene Punkte und Quellen aktualisiert |
+| 1.2     | 2026-06-15 |       | Status-Update: BLE-REQ-01..10, BLE-NFR-02..04 → Umgesetzt; Koexistenz BT+WiFi als gelöst markiert |

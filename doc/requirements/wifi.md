@@ -16,7 +16,7 @@ Das WiFi-Modul soll beim Systemstart initialisiert werden. Es liest die gespeich
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Offen  |                 |
+| Hoch      | Umgesetzt | `app/src/wifi.c:Wifi_Thread()` (Zeile 104): liest Config, startet Verbindungsversuch bei gültiger SSID; LOG_INF "Keine SSID konfiguriert." bei leerem Eintrag |
 
 #### Abhängigkeiten
 
@@ -39,7 +39,7 @@ Das WiFi-Modul soll in einem eigenen Zephyr-Thread laufen. Der Thread verwaltet 
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Offen  |                 |
+| Hoch      | Umgesetzt | `app/src/wifi.c`: `K_THREAD_DEFINE(wifi_thread, WIFI_THREAD_STACK_SIZE, Wifi_Thread, …)` (Zeile 208); Stack-Größe `WIFI_THREAD_STACK_SIZE = 4096` als Compile-Zeit-Konstante |
 
 #### Abhängigkeiten
 
@@ -60,7 +60,7 @@ Das WiFi-Modul soll Statusmeldungen über den Verbindungszustand ausgeben. Meldu
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Mittel    | Offen  |                 |
+| Mittel    | Umgesetzt | `app/src/wifi.c:Wifi_Thread()` (LOG_INF "Verbinde mit..."), `Wifi_PrintIpAddress()` (LOG_INF "Verbunden. IP:"), `Wifi_EventCallback()` (LOG_INF "Verbindung getrennt."); LOG_WRN "Verbindung fehlgeschlagen" bei Timeout (Zeile 187) und Fehler (Zeile 199) |
 
 #### Abhängigkeiten
 
@@ -84,7 +84,7 @@ Nach dem Speichern einer neuen WLAN-Konfiguration über die Shell soll das WiFi-
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Offen  |                 |
+| Hoch      | Umgesetzt | `app/src/shell.c:Shell_CmdWifiSet()` (Zeile 349) ruft `Wifi_Reconnect()` (Zeile 416) nach Speichern; `app/src/wifi.c:Wifi_Thread()` trennt laufende Verbindung vor neuem Versuch (Zeile 142) |
 
 #### Abhängigkeiten
 
@@ -162,7 +162,7 @@ Die WiFi-Implementierung soll den MISRA-C-Coding-Standards des Projekts entsprec
 
 | Priorität | Kategorie   | Status | Implementierung |
 |-----------|-------------|--------|-----------------|
-| Hoch      | Wartbarkeit | Offen  |                 |
+| Hoch      | Wartbarkeit | Umgesetzt | `app/src/wifi.c` — ausschließlich Zephyr-API (`zephyr/net/wifi_mgmt.h`, `zephyr/net/net_event.h`, `net_mgmt`); kein ESP-IDF-Zugriff |
 
 #### Abhängigkeiten
 
@@ -183,7 +183,7 @@ Das WiFi-Modul soll ausschließlich statischen Speicher verwenden. Dynamische Sp
 
 | Priorität | Kategorie    | Status | Implementierung |
 |-----------|--------------|--------|-----------------|
-| Hoch      | Zuverlässigkeit | Offen |                |
+| Hoch      | Zuverlässigkeit | Umgesetzt | `app/src/wifi.c` — kein `malloc`/`free`; statischer Thread-Stack `K_THREAD_DEFINE` mit `WIFI_THREAD_STACK_SIZE = 4096` (Zeile 18, 208) |
 
 #### Abhängigkeiten
 
@@ -234,3 +234,4 @@ Keine.
 | 1.2     | 2026-05-28 |       | WIF-REQ-06 ergänzt: Konfigurierbarer Hostname |
 | 1.3     | 2026-05-28 |       | WIF-REQ-06 umgesetzt |
 | 1.4     | 2026-06-14 |       | WIF-REQ-07 ergänzt und umgesetzt: automatische Wiederverbindung |
+| 1.5     | 2026-06-15 |       | Status-Update: WIF-REQ-01..04, WIF-NFR-01..02 → Umgesetzt |

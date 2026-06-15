@@ -18,7 +18,7 @@ Ist kein Broker konfiguriert (leerer Hostname), unterbleibt der Verbindungsversu
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Offen  |                 |
+| Hoch      | Umgesetzt | `app/src/mqtt.c:Mqtt_Thread()`, `app/src/mqtt.c:Mqtt_DoConnect()`, `app/src/mqtt.c:Mqtt_RunEventLoop()`; Reconnect-Wartezeit 30 s via `g_ReconnectSem`; Client-ID aus WiFi-Hostname (`g_ClientId`) |
 
 #### Abhängigkeiten
 
@@ -48,7 +48,7 @@ SHL-REQ-03 (bisheriger Befehl `mqtt set <broker> <port>`) wird durch dieses Requ
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Offen  |                 |
+| Hoch      | Umgesetzt | `app/src/shell.c:Shell_CmdMqttSet()` (Zeile 491); Passwort-Eingabe verdeckt mit `*`-Echo; `Config_Data_t.mqttPassword[CFG_MQTT_PASS_MAX_LEN + 1U]` in `app/src/config.h` |
 
 #### Abhängigkeiten
 
@@ -124,7 +124,7 @@ Die Shell soll einen Befehl `mqtt status` bereitstellen, der den aktuellen MQTT-
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Mittel    | Offen  |                 |
+| Mittel    | Umgesetzt | `app/src/shell.c:Shell_CmdMqttStatus()` (Zeile 522); `app/src/mqtt.h:Mqtt_GetStatus()`, `app/src/mqtt.c:Mqtt_GetStatus()` (Zeile 214) |
 
 #### Abhängigkeiten
 
@@ -180,7 +180,7 @@ Die MQTT-Implementierung soll ausschließlich statischen Speicher verwenden. Dyn
 
 | Priorität | Kategorie       | Status | Implementierung |
 |-----------|-----------------|--------|-----------------|
-| Hoch      | Zuverlässigkeit | Offen  |                 |
+| Hoch      | Zuverlässigkeit | Umgesetzt | `app/src/mqtt.c` — statische Puffer `g_RxBuf`/`g_TxBuf` (Zeile 24–25); kein `malloc`/`free`; `zsock_freeaddrinfo()` ist Zephyr-intern und kein `free()`-Äquivalent |
 
 #### Abhängigkeiten
 
@@ -207,3 +207,4 @@ Keine.
 | Version | Datum      | Autor | Änderung |
 |---------|------------|-------|----------|
 | 1.0     | 2026-06-14 |       | Erstellt: MQT-REQ-01..04 (Verbindungsaufbau, Shell-Konfiguration, Topic-Format, Status) |
+| 1.1     | 2026-06-15 |       | Status-Update: MQT-REQ-01, MQT-REQ-02, MQT-REQ-04, MQT-NFR-02 → Umgesetzt (Commits 2bcd354, 9269aec) |

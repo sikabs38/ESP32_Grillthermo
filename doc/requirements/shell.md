@@ -61,23 +61,11 @@ Die Shell soll die Konfiguration der WiFi-Zugangsdaten (SSID und Passwort) ermö
 
 ### SHL-REQ-03
 
-#### Beschreibung
-
-Die Shell soll die Konfiguration des MQTT-Brokers (Hostname und Port) ermöglichen.
+> **Abgelöst durch MQT-REQ-02** (siehe `doc/requirements/mqtt.md`). Der Befehl `mqtt set <broker> <port>` entfällt; an seine Stelle tritt `mqtt set <broker>` mit interaktivem Passwort-Prompt und festem Port 1883.
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Umgesetzt | `app/src/shell.c:Shell_CmdMqttSet()` |
-
-#### Abhängigkeiten
-
-- SHL-REQ-01 (Shell über USB)
-
-#### Abnahmekriterien
-
-- Der Befehl `mqtt set <broker> <port>` wird akzeptiert
-- Ungültige Port-Angaben (nicht numerisch, außerhalb 1–65535) werden abgewiesen
-- Die gespeicherten Broker-Daten werden beim nächsten Start verwendet
+| Hoch      | Abgelöst | — (ersetzt durch MQT-REQ-02) |
 
 ---
 
@@ -325,7 +313,7 @@ Die Shell soll ausschließlich statischen Speicher verwenden. Dynamische Speiche
 
 | Priorität | Kategorie    | Status | Implementierung |
 |-----------|--------------|--------|-----------------|
-| Hoch      | Zuverlässigkeit | Offen |                |
+| Hoch      | Zuverlässigkeit | Umgesetzt | `app/src/shell.c` — kein `malloc`/`free`; alle Puffer statisch (z.B. `g_Pin`, Bypass-Eingabepuffer `g_Buf`); Puffergrößen als `CFG_*_MAX_LEN`-Konstanten |
 
 #### Abhängigkeiten
 
@@ -346,7 +334,7 @@ Eine ungültige Eingabe in der Shell darf nicht zum Absturz oder undefinierten V
 
 | Priorität | Kategorie    | Status | Implementierung |
 |-----------|--------------|--------|-----------------|
-| Hoch      | Zuverlässigkeit | Offen |                |
+| Hoch      | Zuverlässigkeit | Umgesetzt | `app/src/shell.c` — Längenpruefung in allen Bypass-Callbacks gegen `CFG_WIFI_PASS_MAX_LEN`, `CFG_WIFI_SSID_MAX_LEN`, `CFG_MQTT_PASS_MAX_LEN` etc.; Zephyr-Shell verarbeitet ungültige Befehle ohne Reset |
 
 #### Abhängigkeiten
 
@@ -383,3 +371,5 @@ Eine ungültige Eingabe in der Shell darf nicht zum Absturz oder undefinierten V
 | 1.9     | 2026-05-27 |       | SHL-REQ-02 überarbeitet: Passwort wird interaktiv mit `Passwort:`-Prompt und `*`-Verdeckung abgefragt statt als Argument übergeben |
 | 2.0     | 2026-05-27 |       | SHL-REQ-09 ergänzt: `wifi status`-Befehl zur Anzeige des WiFi-Verbindungsstatus |
 | 2.1     | 2026-06-14 |       | SHL-REQ-10 ergänzt: Softwareversionsnummer in der Bootmeldung |
+| 2.2     | 2026-06-14 |       | SHL-REQ-03 als abgelöst markiert: ersetzt durch MQT-REQ-02 (mqtt.md) |
+| 2.3     | 2026-06-15 |       | Status-Update: SHL-NFR-02, SHL-NFR-03 → Umgesetzt |

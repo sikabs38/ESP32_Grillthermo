@@ -262,7 +262,7 @@ Der Webserver soll ausschließlich statischen Speicher verwenden. Dynamische Spe
 
 | Priorität | Kategorie       | Status | Implementierung |
 |-----------|-----------------|--------|-----------------|
-| Hoch      | Zuverlässigkeit | Offen  |                 |
+| Hoch      | Zuverlässigkeit | Umgesetzt | `app/src/webserver.c` — statische Puffer für HTML und SSE-Ausgabe; kein `malloc`/`free` |
 
 #### Abhängigkeiten
 
@@ -312,3 +312,4 @@ Keine.
 | 1.10    | 2026-05-29 |       | WEB-REQ-05 und WEB-REQ-09 abgelöst durch DSP-REQ-01..04; SSE-Feld `target` entfernt; WEB-REQ-07 auf `b1`–`b4` / `c1`–`c4` und Implementierungsverweis auf `Html_AppendDisplay()` aktualisiert |
 | 1.11    | 2026-05-29 |       | SSE-Feld `gas` (Einzeleintrag) ergänzt für DSP-REQ-06 |
 | 1.12    | 2026-06-14 |       | WEB-REQ-10 ergänzt: Versionsnummer in Titelzeile (`<Hostname> Version X.Y`) |
+| 1.13    | 2026-06-15 |       | Status-Update: WEB-NFR-02 → Umgesetzt |

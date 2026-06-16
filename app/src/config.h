@@ -23,11 +23,11 @@
 /* CFG-REQ-04: Konfigurationsparameter */
 typedef struct {
     char     wifiSsid[CFG_WIFI_SSID_MAX_LEN + 1U];
-    char     wifiPassword[CFG_WIFI_PASS_MAX_LEN + 1U]; /* TODO: CFG-REQ-05 AES */
+    char     wifiPassword[CFG_WIFI_PASS_MAX_LEN + 1U]; /* CFG-REQ-05: verschluesselt im NVS */
     char     wifiHostname[CFG_WIFI_HOSTNAME_MAX_LEN + 1U]; /* WIF-REQ-06 */
     char     mqttBroker[CFG_MQTT_BROKER_MAX_LEN + 1U];
     uint16_t mqttPort;
-    char     pin[CFG_PIN_BUF_SIZE];                    /* TODO: CFG-REQ-05 AES */
+    char     pin[CFG_PIN_BUF_SIZE];                    /* CFG-REQ-05: verschluesselt im NVS */
     char     grillMac[CFG_GRILL_MAC_BUF_SIZE];         /* BLE-REQ-07 */
     /* Felder, die nach einer Struct-Erweiterung hinzugefuegt wurden, werden ans Ende
      * gestellt, damit aeltere NVS-Datensaetze rueckwaertskompatibel lesbar bleiben. */

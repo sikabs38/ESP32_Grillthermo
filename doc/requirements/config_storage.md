@@ -118,7 +118,7 @@ Passwörter (WiFi, zukünftige Zugangsdaten) sollen vor dem Schreiben in den nic
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Offen  |                 |
+| Hoch      | Umgesetzt | `app/src/config.c:Config_Encrypt()`, `Config_Decrypt()` — AES-128-CBC via PSA (`psa_cipher_encrypt`/`psa_cipher_decrypt`); IV zufällig durch PSA, Ausgabe IV\|\|Chiffrat in `Config_Stored_t.encData`; `psa_crypto_init()` in `Config_Init()`; prj.conf: `CONFIG_MBEDTLS_PSA_CRYPTO_C`, `CONFIG_PSA_WANT_KEY_TYPE_AES`, `CONFIG_PSA_WANT_ALG_CBC_NO_PADDING` |
 
 #### Abhängigkeiten
 
@@ -263,7 +263,7 @@ Ein Lese- oder Schreibfehler im nichtflüchtigen Speicher darf nicht zum Absturz
 - [x] NVS-Partition: `storage_partition` bereits in Board-DTS (`partitions_0x0_amp_4M.dtsi`) bei 0x3B0000, 192 KB — kein DTS-Overlay erforderlich
 - [x] Verschlüsselung des WiFi-Passworts im Flash: AES, siehe CFG-REQ-05
 - [ ] Flash-Verschleiß (Write Cycles) bei häufigen Schreibzugriffen nicht bewertet
-- [ ] CFG-REQ-05 (AES-Verschlüsselung) noch nicht implementiert; TODO-Marker in `config.h` und `shell.c`
+- [x] CFG-REQ-05 (AES-Verschlüsselung) umgesetzt: PSA AES-128-CBC in `config.c`, kein TODO mehr in `config.h` / `shell.c`
 
 ---
 
@@ -278,3 +278,4 @@ Ein Lese- oder Schreibfehler im nichtflüchtigen Speicher darf nicht zum Absturz
 | 1.4     | 2026-05-27 |       | Skill-Alignment: Status „Implementiert" → „Umgesetzt", MISRA C → MISRA C 2023, Bestätigungstext CFG-REQ-03 korrigiert |
 | 1.5     | 2026-05-30 |       | CFG-REQ-04 um `Grill-MAC` (BLE-REQ-07) und den bereits umgesetzten `WiFi Hostname` (WIF-REQ-06) ergänzt |
 | 1.6     | 2026-06-16 |       | CFG-REQ-04 um `Netzwerkmodus` erweitert; CFG-REQ-07 ergänzt: Netzwerkmodus als persistenter Parameter (ADR-001) |
+| 1.7     | 2026-06-16 |       | CFG-REQ-05: Status → Umgesetzt; PSA AES-128-CBC in `config.c` implementiert |

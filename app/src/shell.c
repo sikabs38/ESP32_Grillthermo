@@ -115,7 +115,6 @@ static int Shell_PinStore(const char *newPin)
 
     (void)strncpy(g_Config.pin, newPin, CFG_PIN_BUF_SIZE - 1U);
     g_Config.pin[CFG_PIN_BUF_SIZE - 1U] = '\0';
-    /* TODO: CFG-REQ-05 — PIN AES-verschluesselt speichern */
 
     rc = Config_Save(&g_Config);
 
@@ -307,7 +306,6 @@ static void Shell_WifiPasswordBypass(const struct shell *sh, uint8_t *data,
             (void)strncpy(g_Config.wifiPassword, g_WifiPassBuf,
                           CFG_WIFI_PASS_MAX_LEN);
             g_Config.wifiPassword[CFG_WIFI_PASS_MAX_LEN] = '\0';
-            /* TODO: CFG-REQ-05 — Passwort vor dem Speichern AES-verschluesseln */
 
             rc = Config_Save(&g_Config);
 

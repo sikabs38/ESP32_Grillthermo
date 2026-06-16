@@ -571,6 +571,9 @@ static int Shell_CmdConfigShow(const struct shell *sh, size_t argc, char **argv)
     /* BLE-REQ-07: Grill-MAC im config-show ausgeben */
     shell_print(sh, "Grill MAC    : %s",
                 (g_Config.grillMac[0] != '\0') ? g_Config.grillMac : "[nicht gesetzt]");
+    /* CFG-REQ-07: Netzwerkmodus (ADR-001) */
+    shell_print(sh, "Netzwerkmodus: %s",
+                (g_Config.networkMode == CFG_NETWORK_MQTT) ? "mqtt" : "webserver");
 
     return 0;
 }

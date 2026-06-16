@@ -18,7 +18,7 @@ Der Webserver soll beim Systemstart initialisiert werden und nach erfolgreicher 
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Offen (Modusprüfung) | `app/src/webserver.c:Webserver_Start()`, `Webserver_Stop()`; gerufen aus `app/src/wifi.c:Wifi_IpCallback()` bzw. `Wifi_EventCallback()` |
+| Hoch      | Umgesetzt | `app/src/webserver.c:Webserver_Start()`, `Webserver_Stop()`; Modusprüfung in `app/src/main.c`: `Webserver_Start()` nur bei `cfg.networkMode == CFG_NETWORK_WEBSERVER` |
 
 #### Abhängigkeiten
 
@@ -318,3 +318,4 @@ Keine.
 | 1.12    | 2026-06-14 |       | WEB-REQ-10 ergänzt: Versionsnummer in Titelzeile (`<Hostname> Version X.Y`) |
 | 1.13    | 2026-06-15 |       | Status-Update: WEB-NFR-02 → Umgesetzt |
 | 1.14    | 2026-06-16 |       | WEB-REQ-01 erweitert: Webserver nur aktiv bei Netzwerkmodus `webserver` (ADR-001, CFG-REQ-07) |
+| 1.15    | 2026-06-16 |       | WEB-REQ-01: Status → Umgesetzt; Modusprüfung in main.c implementiert |

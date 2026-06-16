@@ -20,7 +20,7 @@ Ist kein Broker konfiguriert (leerer Hostname), unterbleibt der Verbindungsversu
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Offen (Modusprüfung) | `app/src/mqtt.c:Mqtt_Thread()`, `app/src/mqtt.c:Mqtt_DoConnect()`, `app/src/mqtt.c:Mqtt_RunEventLoop()`; Reconnect-Wartezeit 30 s via `g_ReconnectSem`; Client-ID aus WiFi-Hostname (`g_ClientId`) |
+| Hoch      | Umgesetzt | `app/src/mqtt.c:Mqtt_Thread()`: Modusprüfung zu Beginn — Thread beendet sich sofort wenn `cfg.networkMode != CFG_NETWORK_MQTT`; `Mqtt_DoConnect()`, `Mqtt_RunEventLoop()`; Reconnect-Wartezeit 30 s via `g_ReconnectSem`; Client-ID aus WiFi-Hostname (`g_ClientId`) |
 
 #### Abhängigkeiten
 
@@ -229,3 +229,4 @@ Keine.
 | 1.3     | 2026-06-15 |       | MQT-REQ-03: 10-Sekunden-Takt implementiert; Status → Umgesetzt |
 | 1.4     | 2026-06-15 |       | MQT-REQ-05: `mqtt enable`/`mqtt disable` Shell-Befehle ergänzt; Umgesetzt |
 | 1.5     | 2026-06-16 |       | MQT-REQ-01 erweitert: MQTT nur aktiv bei Netzwerkmodus `mqtt` (ADR-001, CFG-REQ-07); MQT-REQ-05 abgelöst durch SHL-REQ-11 |
+| 1.6     | 2026-06-16 |       | MQT-REQ-01: Status → Umgesetzt; Modusprüfung zu Beginn von Mqtt_Thread() implementiert |

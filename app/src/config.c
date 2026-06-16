@@ -230,6 +230,12 @@ int Config_Load(Config_Data_t *data)
         return decRc;
     }
 
+    /* CFG-REQ-07: Ungueltige Enum-Werte (z.B. aus aelterem NVS) auf Standard setzen */
+    if ((data->networkMode != CFG_NETWORK_WEBSERVER) &&
+        (data->networkMode != CFG_NETWORK_MQTT)) {
+        data->networkMode = CFG_NETWORK_WEBSERVER;
+    }
+
     LOG_INF("Konfiguration geladen (Generation %u).",
             (unsigned int)records[newestIdx].generation);
 
@@ -309,7 +315,8 @@ void Config_GetDefaults(Config_Data_t *data)
     }
 
     (void)memset(data, 0, sizeof(Config_Data_t));
-    data->mqttPort = (uint16_t)CFG_MQTT_PORT_DEFAULT;
+    data->mqttPort    = (uint16_t)CFG_MQTT_PORT_DEFAULT;
+    data->networkMode = CFG_NETWORK_WEBSERVER;  /* CFG-REQ-07 */
     (void)strncpy(data->pin, CFG_PIN_DEFAULT, CFG_PIN_BUF_SIZE - 1U);
     data->pin[CFG_PIN_BUF_SIZE - 1U] = '\0';
 }

@@ -20,6 +20,12 @@
 #define CFG_GRILL_MAC_STR_LEN      (17U)
 #define CFG_GRILL_MAC_BUF_SIZE     (CFG_GRILL_MAC_STR_LEN + 1U)
 
+/* CFG-REQ-07: Netzwerkmodus (ADR-001) — bestimmt welcher Netzwerkdienst aktiv ist */
+typedef enum {
+    CFG_NETWORK_WEBSERVER = 0U,
+    CFG_NETWORK_MQTT      = 1U
+} Config_NetworkMode_t;
+
 /* CFG-REQ-04: Konfigurationsparameter */
 typedef struct {
     char     wifiSsid[CFG_WIFI_SSID_MAX_LEN + 1U];
@@ -31,7 +37,8 @@ typedef struct {
     char     grillMac[CFG_GRILL_MAC_BUF_SIZE];         /* BLE-REQ-07 */
     /* Felder, die nach einer Struct-Erweiterung hinzugefuegt wurden, werden ans Ende
      * gestellt, damit aeltere NVS-Datensaetze rueckwaertskompatibel lesbar bleiben. */
-    char     mqttPassword[CFG_MQTT_PASS_MAX_LEN + 1U];
+    char                 mqttPassword[CFG_MQTT_PASS_MAX_LEN + 1U];
+    Config_NetworkMode_t networkMode;                  /* CFG-REQ-07: ADR-001 */
 } Config_Data_t;
 
 int  Config_Init(void);

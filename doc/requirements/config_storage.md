@@ -172,7 +172,7 @@ Gültige Werte: `webserver` (Webserver aktiv, MQTT-Client inaktiv) und `mqtt` (M
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Offen  |                 |
+| Hoch      | Umgesetzt | `app/src/config.h`: `Config_NetworkMode_t` (Enum), `Config_Data_t.networkMode`; `app/src/config.c`: Standardwert `CFG_NETWORK_WEBSERVER` in `Config_GetDefaults()`, Enum-Validierung in `Config_Load()`; `app/src/main.c`: Modusprüfung vor `Webserver_Start()`; `app/src/mqtt.c:Mqtt_Thread()`: Thread beendet sich sofort wenn Modus nicht `mqtt`; `app/src/shell.c:Shell_CmdConfigShow()`: Modus anzeigen |
 
 #### Abhängigkeiten
 
@@ -279,3 +279,4 @@ Ein Lese- oder Schreibfehler im nichtflüchtigen Speicher darf nicht zum Absturz
 | 1.5     | 2026-05-30 |       | CFG-REQ-04 um `Grill-MAC` (BLE-REQ-07) und den bereits umgesetzten `WiFi Hostname` (WIF-REQ-06) ergänzt |
 | 1.6     | 2026-06-16 |       | CFG-REQ-04 um `Netzwerkmodus` erweitert; CFG-REQ-07 ergänzt: Netzwerkmodus als persistenter Parameter (ADR-001) |
 | 1.7     | 2026-06-16 |       | CFG-REQ-05: Status → Umgesetzt; PSA AES-128-CBC in `config.c` implementiert |
+| 1.8     | 2026-06-16 |       | CFG-REQ-07: Status → Umgesetzt; `Config_NetworkMode_t`, Modusprüfung in main.c und mqtt.c, Anzeige in config show |

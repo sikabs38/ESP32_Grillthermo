@@ -276,6 +276,15 @@ static void Mqtt_Thread(void *p1, void *p2, void *p3)
     ARG_UNUSED(p2);
     ARG_UNUSED(p3);
 
+    /* MQT-REQ-01 / ADR-001: Thread sofort beenden wenn Netzwerkmodus nicht mqtt.
+     * Config_Init() ist zu diesem Zeitpunkt via SYS_INIT bereits abgeschlossen. */
+    if (Config_Load(&cfg) != 0) {
+        Config_GetDefaults(&cfg);
+    }
+    if (cfg.networkMode != CFG_NETWORK_MQTT) {
+        return;
+    }
+
     for (;;) {
         /* MQT-REQ-01: Erst WiFi abwarten, bevor Verbindungsversuch */
         while (!Wifi_WaitConnected(K_SECONDS(30))) {

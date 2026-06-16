@@ -84,15 +84,16 @@ Das System soll die Konfiguration über die Shell auf die Werkseinstellungen zur
 
 Das System soll folgende Konfigurationsparameter persistent speichern:
 
-| Parameter       | Typ     | Max. Länge  | Standardwert | Verschlüsselt |
-|-----------------|---------|-------------|--------------|---------------|
-| WiFi SSID       | String  | 32 Zeichen  | `[leer]`     | Nein          |
-| WiFi Passwort   | String  | 64 Zeichen  | `[leer]`     | Ja (AES)      |
-| WiFi Hostname   | String  | 63 Zeichen  | `[leer]`     | Nein          |
-| MQTT Broker     | String  | 128 Zeichen | `[leer]`     | Nein          |
-| MQTT Port       | uint16  | —           | `1883`       | Nein          |
-| Shell-PIN       | String  | 4–6 Ziffern | `000000`     | Ja (AES)      |
+| Parameter       | Typ     | Max. Länge  | Standardwert  | Verschlüsselt |
+|-----------------|---------|-------------|---------------|---------------|
+| WiFi SSID       | String  | 32 Zeichen  | `[leer]`      | Nein          |
+| WiFi Passwort   | String  | 64 Zeichen  | `[leer]`      | Ja (AES)      |
+| WiFi Hostname   | String  | 63 Zeichen  | `[leer]`      | Nein          |
+| MQTT Broker     | String  | 128 Zeichen | `[leer]`      | Nein          |
+| MQTT Port       | uint16  | —           | `1883`        | Nein          |
+| Shell-PIN       | String  | 4–6 Ziffern | `000000`      | Ja (AES)      |
 | Grill-MAC       | String  | 17 Zeichen (`AA:BB:CC:DD:EE:FF`) | `[leer]` | Nein |
+| Netzwerkmodus   | Enum    | —           | `webserver`   | Nein          |
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
@@ -158,6 +159,36 @@ Beim Laden wird der neueste gültige Datensatz ausgewählt (höchste Generations
 - Beim Laden wird der Datensatz mit der höchsten gültigen Generationsnummer verwendet
 - Ein ungültiger Datensatz hat `valid = false` UND eine falsche CRC (korrekte CRC XOR 0xFFFFFFFF)
 - Die Generationsauswahl verwendet modularen `uint8_t`-Vergleich für Überlaufbehandlung
+
+---
+
+### CFG-REQ-07
+
+#### Beschreibung
+
+Das System soll einen Netzwerkmodus als Konfigurationsparameter speichern. Der Modus legt fest, welcher der beiden Netzwerkdienste — Webserver oder MQTT-Client — beim Systemstart aktiviert wird. Nur einer der beiden Dienste kann gleichzeitig aktiv sein (siehe ADR-001).
+
+Gültige Werte: `webserver` (Webserver aktiv, MQTT-Client inaktiv) und `mqtt` (MQTT-Client aktiv, Webserver inaktiv). Der Standardwert nach Erstinbetriebnahme und nach Factory Reset (CFG-REQ-03) ist `webserver`.
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Hoch      | Offen  |                 |
+
+#### Abhängigkeiten
+
+- CFG-REQ-01 (Persistentes Speichern)
+- CFG-REQ-02 (Laden beim Start)
+- CFG-REQ-03 (Factory Reset setzt Standardwert `webserver`)
+- ADR-001 (Designentscheidung: gegenseitiger Ausschluss)
+
+#### Abnahmekriterien
+
+- `Config_Data_t` enthält ein Feld `networkMode` vom Typ `Config_NetworkMode_t` (Enum: `CFG_NETWORK_WEBSERVER`, `CFG_NETWORK_MQTT`)
+- Der Standardwert ist `CFG_NETWORK_WEBSERVER`
+- Der Wert wird korrekt in den NVS geschrieben und beim Start geladen
+- `config show` zeigt den aktuellen Netzwerkmodus an (`Webserver` oder `MQTT`)
+- `config reset` setzt den Netzwerkmodus auf `webserver` zurück
+- Ungültige Werte im NVS werden durch den Standardwert `webserver` ersetzt
 
 ---
 
@@ -246,3 +277,4 @@ Ein Lese- oder Schreibfehler im nichtflüchtigen Speicher darf nicht zum Absturz
 | 1.3     | 2026-05-27 |       | CFG-REQ-06 ergänzt: 3-Generationen-Speicher mit CRC32 und Gültigkeitsflag; Implementierungsstatus aktualisiert |
 | 1.4     | 2026-05-27 |       | Skill-Alignment: Status „Implementiert" → „Umgesetzt", MISRA C → MISRA C 2023, Bestätigungstext CFG-REQ-03 korrigiert |
 | 1.5     | 2026-05-30 |       | CFG-REQ-04 um `Grill-MAC` (BLE-REQ-07) und den bereits umgesetzten `WiFi Hostname` (WIF-REQ-06) ergänzt |
+| 1.6     | 2026-06-16 |       | CFG-REQ-04 um `Netzwerkmodus` erweitert; CFG-REQ-07 ergänzt: Netzwerkmodus als persistenter Parameter (ADR-001) |

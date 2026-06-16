@@ -16,21 +16,25 @@ Das System soll nach erfolgreicher WiFi-Verbindung automatisch eine Verbindung z
 
 Ist kein Broker konfiguriert (leerer Hostname), unterbleibt der Verbindungsversuch. Bei Verbindungsabbruch soll die Verbindung nach einem Warteintervall von 30 Sekunden automatisch neu aufgebaut werden.
 
+**Der MQTT-Client wird nur gestartet, wenn der konfigurierte Netzwerkmodus `mqtt` ist (CFG-REQ-07, ADR-001).** Im Modus `webserver` bleibt der MQTT-Client dauerhaft inaktiv.
+
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Umgesetzt | `app/src/mqtt.c:Mqtt_Thread()`, `app/src/mqtt.c:Mqtt_DoConnect()`, `app/src/mqtt.c:Mqtt_RunEventLoop()`; Reconnect-Wartezeit 30 s via `g_ReconnectSem`; Client-ID aus WiFi-Hostname (`g_ClientId`) |
+| Hoch      | Offen (Modusprüfung) | `app/src/mqtt.c:Mqtt_Thread()`, `app/src/mqtt.c:Mqtt_DoConnect()`, `app/src/mqtt.c:Mqtt_RunEventLoop()`; Reconnect-Wartezeit 30 s via `g_ReconnectSem`; Client-ID aus WiFi-Hostname (`g_ClientId`) |
 
 #### Abhängigkeiten
 
 - WIF-REQ-01 (WiFi-Verbindung als Voraussetzung)
 - MQT-REQ-02 (Konfiguration von Broker und Passwort)
 - CFG-REQ-01 (Persistente Konfiguration)
+- CFG-REQ-07 (Netzwerkmodus — MQTT nur aktiv bei `networkMode = mqtt`)
 
 #### Abnahmekriterien
 
-- Nach WiFi-Verbindungsaufbau wird automatisch eine MQTT-Verbindung zum konfigurierten Broker hergestellt
+- Nach WiFi-Verbindungsaufbau wird automatisch eine MQTT-Verbindung zum konfigurierten Broker hergestellt, **sofern** der Netzwerkmodus `mqtt` ist
 - Als Client-ID wird der WiFi-Hostname des Geräts verwendet
 - Ist kein Broker konfiguriert, bleibt die MQTT-Verbindung inaktiv — kein Fehler
+- Ist der Netzwerkmodus `webserver`, startet der MQTT-Thread nicht — auch nicht nach erfolgreicher WiFi-Verbindung
 - Bei Verbindungsabbruch wird nach 30 Sekunden automatisch ein erneuter Verbindungsversuch gestartet
 - Der Verbindungsstatus ist über `mqtt status` in der Shell abfragbar (MQT-REQ-04)
 
@@ -151,6 +155,17 @@ Die Shell soll einen Befehl `mqtt status` bereitstellen, der den aktuellen MQTT-
 
 ---
 
+### MQT-REQ-05
+
+> **Abgelöst durch CFG-REQ-07 und SHL-REQ-11** (ADR-001). Die Befehle `mqtt enable` / `mqtt disable` entfallen: Die Aktivierung des MQTT-Clients wird nun durch den Netzwerkmodus (`config mode mqtt` / `config mode webserver`) gesteuert. Der Konfigurationsparameter `mqttDisabled` in `Config_Data_t` entfällt ebenfalls.
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Mittel    | Abgelöst | — (ersetzt durch CFG-REQ-07 / SHL-REQ-11) |
+
+---
+
+
 ## 3. Nicht-funktionale Anforderungen
 
 ### MQT-NFR-01
@@ -212,3 +227,5 @@ Keine.
 | 1.1     | 2026-06-15 |       | Status-Update: MQT-REQ-01, MQT-REQ-02, MQT-REQ-04, MQT-NFR-02 → Umgesetzt (Commits 2bcd354, 9269aec) |
 | 1.2     | 2026-06-15 |       | MQT-REQ-03: Publish-Intervall 10 Sekunden ergänzt; Status → In Bearbeitung |
 | 1.3     | 2026-06-15 |       | MQT-REQ-03: 10-Sekunden-Takt implementiert; Status → Umgesetzt |
+| 1.4     | 2026-06-15 |       | MQT-REQ-05: `mqtt enable`/`mqtt disable` Shell-Befehle ergänzt; Umgesetzt |
+| 1.5     | 2026-06-16 |       | MQT-REQ-01 erweitert: MQTT nur aktiv bei Netzwerkmodus `mqtt` (ADR-001, CFG-REQ-07); MQT-REQ-05 abgelöst durch SHL-REQ-11 |

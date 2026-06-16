@@ -20,3 +20,9 @@ Angezeigt werden die vier Bereiche der Brenner sowie die vier Thermometer.
 # Coding Guidelines
 
 + MISRA C gilt für den Code
+
+# ADRs
+
+| Nr.      | Titel                                              | Status   |
+|----------|----------------------------------------------------|----------|
+| ADR-0001 | [Webserver und MQTT-Client gegenseitig ausschließen](doc/adr/0001-netzwerk-modus.md) | Accepted |

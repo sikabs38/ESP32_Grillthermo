@@ -282,6 +282,45 @@ Version:   X.Y
 
 ---
 
+### SHL-REQ-11
+
+#### Beschreibung
+
+Die Shell soll Befehle `config mode webserver` und `config mode mqtt` bereitstellen, um den Netzwerkmodus des Geräts umzuschalten. Der Netzwerkmodus legt fest, welcher der beiden Netzwerkdienste — Webserver oder MQTT-Client — beim nächsten Systemstart aktiviert wird (siehe ADR-001 und CFG-REQ-07).
+
+Die Einstellung wird sofort persistent gespeichert. Da ein Moduswechsel den aktiven Netzwerkdienst betrifft, wird das Gerät nach Bestätigung automatisch neu gestartet.
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Hoch      | Offen  |                 |
+
+#### Abhängigkeiten
+
+- SHL-REQ-01 (Shell über USB)
+- SHL-REQ-06 (PIN-Schutz und Authentifizierung)
+- CFG-REQ-07 (Netzwerkmodus als persistenter Parameter)
+
+#### Abnahmekriterien
+
+- Der Befehl lautet `config mode webserver` bzw. `config mode mqtt` (exakt ein Argument)
+- Ungültige Argumente (weder `webserver` noch `mqtt`) werden mit einer Fehlermeldung abgewiesen
+- Nach Eingabe eines gültigen Modus erscheint die Bestätigung und das Gerät startet neu:
+  ```
+  Netzwerkmodus: webserver
+  Neustart...
+  ```
+  bzw.
+  ```
+  Netzwerkmodus: mqtt
+  Neustart...
+  ```
+- Ist der angeforderte Modus bereits aktiv, erscheint eine entsprechende Hinweismeldung; kein Neustart
+- Der neue Modus wird vor dem Neustart in den NVS geschrieben
+- `config show` zeigt den aktuellen Netzwerkmodus an
+- Der Befehl ist nur im eingeloggten Zustand ausführbar (SHL-REQ-06)
+
+---
+
 ## 3. Nicht-funktionale Anforderungen
 
 ### SHL-NFR-01
@@ -373,3 +412,4 @@ Eine ungültige Eingabe in der Shell darf nicht zum Absturz oder undefinierten V
 | 2.1     | 2026-06-14 |       | SHL-REQ-10 ergänzt: Softwareversionsnummer in der Bootmeldung |
 | 2.2     | 2026-06-14 |       | SHL-REQ-03 als abgelöst markiert: ersetzt durch MQT-REQ-02 (mqtt.md) |
 | 2.3     | 2026-06-15 |       | Status-Update: SHL-NFR-02, SHL-NFR-03 → Umgesetzt |
+| 2.4     | 2026-06-16 |       | SHL-REQ-11 ergänzt: `config mode webserver`/`mqtt` — Netzwerkmodus umschalten (ADR-001) |

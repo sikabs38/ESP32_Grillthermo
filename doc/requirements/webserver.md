@@ -14,19 +14,23 @@ Der Webserver stellt eine HTTP-Schnittstelle bereit, über die das ESP32 Grillth
 
 Der Webserver soll beim Systemstart initialisiert werden und nach erfolgreicher WiFi-Verbindung HTTP-Anfragen auf Port 80 entgegennehmen. Solange keine WiFi-Verbindung besteht, bleibt der Server inaktiv. Nach Verbindungsaufbau wird der Server automatisch gestartet.
 
+**Der Webserver wird nur gestartet, wenn der konfigurierte Netzwerkmodus `webserver` ist (CFG-REQ-07, ADR-001).** Im Modus `mqtt` bleibt der Webserver dauerhaft inaktiv.
+
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Umgesetzt | `app/src/webserver.c:Webserver_Start()`, `Webserver_Stop()`; gerufen aus `app/src/wifi.c:Wifi_IpCallback()` bzw. `Wifi_EventCallback()` |
+| Hoch      | Offen (Modusprüfung) | `app/src/webserver.c:Webserver_Start()`, `Webserver_Stop()`; gerufen aus `app/src/wifi.c:Wifi_IpCallback()` bzw. `Wifi_EventCallback()` |
 
 #### Abhängigkeiten
 
 - WIF-REQ-01 (WiFi-Initialisierung)
 - WIF-REQ-03 (WiFi-Statusmeldungen — Verbindungsaufbau als Startsignal)
+- CFG-REQ-07 (Netzwerkmodus — Webserver nur aktiv bei `networkMode = webserver`)
 
 #### Abnahmekriterien
 
-- Nach erfolgreicher WiFi-Verbindung ist `http://<ip>/` im Browser erreichbar
+- Nach erfolgreicher WiFi-Verbindung ist `http://<ip>/` im Browser erreichbar, **sofern** der Netzwerkmodus `webserver` ist
 - Vor der WiFi-Verbindung gibt der Server keine Antworten zurück
+- Ist der Netzwerkmodus `mqtt`, startet der Webserver nicht — auch nicht nach erfolgreicher WiFi-Verbindung
 - Der Server läuft auf Port 80 (HTTP)
 - Der Server blockiert nicht den WiFi-Thread oder die Shell
 
@@ -313,3 +317,4 @@ Keine.
 | 1.11    | 2026-05-29 |       | SSE-Feld `gas` (Einzeleintrag) ergänzt für DSP-REQ-06 |
 | 1.12    | 2026-06-14 |       | WEB-REQ-10 ergänzt: Versionsnummer in Titelzeile (`<Hostname> Version X.Y`) |
 | 1.13    | 2026-06-15 |       | Status-Update: WEB-NFR-02 → Umgesetzt |
+| 1.14    | 2026-06-16 |       | WEB-REQ-01 erweitert: Webserver nur aktiv bei Netzwerkmodus `webserver` (ADR-001, CFG-REQ-07) |

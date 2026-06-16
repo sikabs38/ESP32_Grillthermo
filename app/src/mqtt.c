@@ -24,11 +24,12 @@ LOG_MODULE_REGISTER(grill_mqtt, LOG_LEVEL_INF);
 #define MQTT_THREAD_PRIO     (5)
 
 /* MQT-REQ-03: Publishing-Konstanten */
-#define MQTT_PUB_STACK_SIZE  (2048U)
-#define MQTT_PUB_THREAD_PRIO (6)
-#define MQTT_TOPIC_BUF_SIZE  (32U)
-#define MQTT_PAYLOAD_BUF_SIZE (8U)
-#define MQTT_TOPIC_PREFIX    "ESP_Grillthermo/"
+#define MQTT_PUB_STACK_SIZE    (2048U)
+#define MQTT_PUB_THREAD_PRIO   (6)
+#define MQTT_TOPIC_BUF_SIZE    (32U)
+#define MQTT_PAYLOAD_BUF_SIZE  (8U)
+#define MQTT_TOPIC_PREFIX      "ESP_Grillthermo/"
+#define MQTT_PUBLISH_INTERVAL_S (10U)
 
 static uint8_t            g_RxBuf[MQTT_RX_BUF_SIZE];
 static uint8_t            g_TxBuf[MQTT_TX_BUF_SIZE];
@@ -243,27 +244,22 @@ static void Mqtt_PublishSnapshot(const Temp_Data_t *snap)
     }
 }
 
-/* MQT-REQ-03: Publish-Thread — wartet auf Temperaturänderungen und publiziert gültige Werte */
+/* MQT-REQ-03: Publish-Thread — publiziert alle gueltigen Messwerte im 10-Sekunden-Takt */
 static void Mqtt_PublishThread(void *p1, void *p2, void *p3)
 {
     Temp_Data_t snap;
-    uint32_t    last_gen = 0U;
 
     ARG_UNUSED(p1);
     ARG_UNUSED(p2);
     ARG_UNUSED(p3);
 
     for (;;) {
-        /* TMP-REQ-03: Auf Aenderung warten; Snapshot unter g_TempMutex erstellen */
+        k_sleep(K_SECONDS(MQTT_PUBLISH_INTERVAL_S));
+
         (void)k_mutex_lock(&g_TempMutex, K_FOREVER);
-        while (g_TempGen == last_gen) {
-            (void)k_condvar_wait(&g_TempCondvar, &g_TempMutex, K_FOREVER);
-        }
-        last_gen = g_TempGen;
         snap = g_TempData;
         (void)k_mutex_unlock(&g_TempMutex);
 
-        /* g_Connected unter g_MqttClientMutex lesen: verhindert Daten-Race mit Event-Loop */
         (void)k_mutex_lock(&g_MqttClientMutex, K_FOREVER);
         if (g_Connected) {
             Mqtt_PublishSnapshot(&snap);

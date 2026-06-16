@@ -292,7 +292,7 @@ Die Einstellung wird sofort persistent gespeichert. Da ein Moduswechsel den akti
 
 | Priorität | Status | Implementierung |
 |-----------|--------|-----------------|
-| Hoch      | Offen  |                 |
+| Hoch      | Umgesetzt | `app/src/shell.c:Shell_CmdConfigMode()` — Argument `webserver`/`mqtt`; Hinweis bei unverändertem Modus; `Config_Save()` + `sys_reboot(SYS_REBOOT_WARM)` nach 100 ms Verzögerung; prj.conf: `CONFIG_REBOOT=y` |
 
 #### Abhängigkeiten
 
@@ -413,3 +413,4 @@ Eine ungültige Eingabe in der Shell darf nicht zum Absturz oder undefinierten V
 | 2.2     | 2026-06-14 |       | SHL-REQ-03 als abgelöst markiert: ersetzt durch MQT-REQ-02 (mqtt.md) |
 | 2.3     | 2026-06-15 |       | Status-Update: SHL-NFR-02, SHL-NFR-03 → Umgesetzt |
 | 2.4     | 2026-06-16 |       | SHL-REQ-11 ergänzt: `config mode webserver`/`mqtt` — Netzwerkmodus umschalten (ADR-001) |
+| 2.5     | 2026-06-16 |       | SHL-REQ-11: Status → Umgesetzt; `Shell_CmdConfigMode()` mit `sys_reboot()` implementiert |

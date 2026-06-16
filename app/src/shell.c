@@ -12,6 +12,7 @@
 #include <zephyr/shell/shell.h>
 #include <zephyr/shell/shell_uart.h>
 #include <zephyr/drivers/uart.h>
+#include <zephyr/sys/reboot.h>
 #include <zephyr/version.h>
 #include <stdlib.h>
 #include <string.h>
@@ -618,6 +619,56 @@ static int Shell_CmdConfigPin(const struct shell *sh, size_t argc, char **argv)
 }
 
 /* ------------------------------------------------------------------ */
+/* config mode                                            SHL-REQ-11  */
+/* ------------------------------------------------------------------ */
+
+static int Shell_CmdConfigMode(const struct shell *sh, size_t argc, char **argv)
+{
+    Config_NetworkMode_t newMode;
+    int                  rc;
+
+    if (!Shell_CheckAuth(sh)) {
+        return -EACCES;
+    }
+
+    if (argc != 2) {
+        shell_error(sh, "Verwendung: config mode <webserver|mqtt>");
+        return -EINVAL;
+    }
+
+    if (strncmp(argv[1], "webserver", 10U) == 0) {
+        newMode = CFG_NETWORK_WEBSERVER;
+    } else if (strncmp(argv[1], "mqtt", 5U) == 0) {
+        newMode = CFG_NETWORK_MQTT;
+    } else {
+        shell_error(sh, "Ungueltiger Modus: \"%s\". Erlaubt: webserver, mqtt", argv[1]);
+        return -EINVAL;
+    }
+
+    if (newMode == g_Config.networkMode) {
+        shell_print(sh, "Netzwerkmodus ist bereits: %s", argv[1]);
+        return 0;
+    }
+
+    g_Config.networkMode = newMode;
+    rc = Config_Save(&g_Config);
+
+    if (rc < 0) {
+        shell_error(sh, "Fehler beim Speichern: %d", rc);
+        return rc;
+    }
+
+    shell_print(sh, "Netzwerkmodus: %s", argv[1]);
+    shell_print(sh, "Neustart...");
+
+    /* SHL-REQ-11: Kurze Verzoegerung damit die Ausgabe noch uebertragen wird */
+    k_sleep(K_MSEC(100));
+    sys_reboot(SYS_REBOOT_WARM);
+
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
 /* config reset                                           CFG-REQ-03  */
 /* ------------------------------------------------------------------ */
 
@@ -946,6 +997,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_mqtt,
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_config,
     SHELL_CMD(show, NULL, "Konfiguration anzeigen", Shell_CmdConfigShow),
     SHELL_CMD_ARG(pin, NULL, "PIN aendern: <alte-pin> <neue-pin>", Shell_CmdConfigPin, 3, 0),
+    SHELL_CMD_ARG(mode, NULL, "Netzwerkmodus setzen: <webserver|mqtt>", Shell_CmdConfigMode, 2, 0),
     SHELL_CMD_ARG(reset, NULL, "Werkseinstellungen: confirm zum Bestaetigen",
                   Shell_CmdConfigReset, 1, 1),
     SHELL_SUBCMD_SET_END

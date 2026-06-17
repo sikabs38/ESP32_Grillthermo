@@ -1,4 +1,4 @@
-/* SHL-REQ-01, SHL-REQ-06, SHL-REQ-07, SHL-REQ-08, SHL-REQ-10: Shell, Login, Bootmeldung, Bootloader, Version */
+/* SHL-REQ-01, SHL-REQ-06, SHL-REQ-07, SHL-REQ-08, SHL-REQ-10, SHL-REQ-11: Shell, Login, Bootmeldung, Bootloader, Version, Reboot */
 #include "config.h"
 #include "wifi.h"
 #include "bluetooth.h"
@@ -11,6 +11,7 @@
 #include <zephyr/shell/shell.h>
 #include <zephyr/shell/shell_uart.h>
 #include <zephyr/drivers/uart.h>
+#include <zephyr/sys/reboot.h>
 #include <zephyr/version.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,6 +51,10 @@ static struct k_work_delayable g_DtrWork;
 static char   g_BootPinBuf[CFG_PIN_BUF_SIZE];
 static size_t g_BootPinBufLen        = 0U;
 static bool   g_BootPinPromptPrinted = false;
+/* SHL-REQ-11: Puffer fuer PIN-Eingabe im Reboot-Bypass */
+static char   g_RebootPinBuf[CFG_PIN_BUF_SIZE];
+static size_t g_RebootPinBufLen        = 0U;
+static bool   g_RebootPinPromptPrinted = false;
 /* SHL-REQ-02: Zwischenspeicher fuer SSID; Passworteingabe-Puffer im WiFi-Bypass */
 static char   g_WifiSsidStaging[CFG_WIFI_SSID_MAX_LEN + 1U];
 static char   g_WifiPassBuf[CFG_WIFI_PASS_MAX_LEN + 1U];
@@ -591,6 +596,76 @@ static int Shell_CmdBootloader(const struct shell *sh, size_t argc, char **argv)
     g_BootPinPromptPrinted = true;
     (void)shell_obscure_set(sh, true);
     shell_set_bypass(sh, Shell_BootloaderPinBypass, NULL);
+    shell_fprintf(sh, SHELL_NORMAL, "Pin: ");
+
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* reboot                                                 SHL-REQ-11  */
+/* ------------------------------------------------------------------ */
+
+/* SHL-REQ-11: Bypass-Callback — nimmt PIN-Eingabe entgegen, loest bei
+ * korrekter PIN einen Systemneustart aus.                             */
+static void Shell_RebootPinBypass(const struct shell *sh, uint8_t *data,
+                                  size_t len, void *user_data)
+{
+    size_t i;
+
+    ARG_UNUSED(user_data);
+
+    for (i = 0U; i < len; i++) {
+        uint8_t c = data[i];
+
+        if ((c == (uint8_t)'\r') || (c == (uint8_t)'\n')) {
+            g_RebootPinBuf[g_RebootPinBufLen] = '\0';
+            shell_fprintf(sh, SHELL_NORMAL, "\n");
+
+            if (strncmp(g_RebootPinBuf, g_Config.pin, CFG_PIN_BUF_SIZE) == 0) {
+                shell_print(sh, "PIN korrekt. System wird neu gestartet ...");
+                sys_reboot(SYS_REBOOT_COLD);
+                /* Ab hier kein Rueckkehr */
+            } else {
+                shell_error(sh, "Falsche PIN. Vorgang abgebrochen.");
+            }
+
+            /* Bypass beenden (nur bei falscher PIN erreichbar) */
+            g_RebootPinBufLen        = 0U;
+            g_RebootPinBuf[0]        = '\0';
+            g_RebootPinPromptPrinted = false;
+            (void)shell_obscure_set(sh, false);
+            shell_set_bypass(sh, NULL, NULL);
+            return;
+
+        } else if ((c == (uint8_t)'\b') || (c == 0x7fU)) {
+            if (g_RebootPinBufLen > 0U) {
+                g_RebootPinBufLen--;
+                shell_fprintf(sh, SHELL_NORMAL, "\b \b");
+            }
+        } else if (g_RebootPinBufLen < (CFG_PIN_BUF_SIZE - 1U)) {
+            g_RebootPinBuf[g_RebootPinBufLen] = (char)c;
+            g_RebootPinBufLen++;
+            shell_fprintf(sh, SHELL_NORMAL, "*");
+        } else {
+            /* Puffer voll; Zeichen ignorieren */
+        }
+    }
+}
+
+static int Shell_CmdReboot(const struct shell *sh, size_t argc, char **argv)
+{
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+
+    if (!Shell_CheckAuth(sh)) {
+        return -EACCES;
+    }
+
+    g_RebootPinBufLen        = 0U;
+    g_RebootPinBuf[0]        = '\0';
+    g_RebootPinPromptPrinted = true;
+    (void)shell_obscure_set(sh, true);
+    shell_set_bypass(sh, Shell_RebootPinBypass, NULL);
     shell_fprintf(sh, SHELL_NORMAL, "Pin: ");
 
     return 0;
@@ -1233,3 +1308,4 @@ SHELL_CMD_REGISTER(temp,       &sub_temp,   "Temperaturwerte setzen (Test)",    
 SHELL_CMD_REGISTER(gas,        &sub_gas,    "Gasflaschen-Fuellstand setzen (Test)", NULL);
 SHELL_CMD_REGISTER(bt,         &sub_bt,     "Bluetooth-Kopplung mit Otto Wilde G32", NULL);
 SHELL_CMD_REGISTER(bootloader, NULL,        "In Download-Modus wechseln",       Shell_CmdBootloader);
+SHELL_CMD_REGISTER(reboot,     NULL,        "System neu starten",               Shell_CmdReboot);

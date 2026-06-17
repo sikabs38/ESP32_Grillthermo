@@ -272,6 +272,33 @@ Version:   X.Y
 
 ---
 
+### SHL-REQ-11
+
+#### Beschreibung
+
+Die Shell soll einen Befehl `reboot` bereitstellen, der einen Systemneustart auslöst. Da der Befehl einen kritischen Eingriff darstellt, wird nach Eingabe des Befehls die aktuelle PIN interaktiv abgefragt. Als Prompt erscheint `Pin:`, die Eingabe wird mit `*` verdeckt.
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Mittel    | Umgesetzt | `app/src/shell.c:Shell_CmdReboot()`, `Shell_RebootPinBypass()` |
+
+#### Abhängigkeiten
+
+- SHL-REQ-01 (Shell über USB)
+- SHL-REQ-06 (PIN-Schutz und Authentifizierung)
+
+#### Abnahmekriterien
+
+- Der Befehl lautet `reboot` (ohne Argument)
+- Nach Eingabe des Befehls erscheint der Prompt `Pin:` und erwartet die PIN-Eingabe
+- Jedes eingegebene Zeichen der PIN wird als `*` angezeigt (kein Klartext-Echo)
+- Korrekturtaste (Backspace/DEL) löscht das zuletzt eingegebene Zeichen und das zugehörige `*`
+- Bei falscher PIN wird eine Fehlermeldung ausgegeben und die Shell bleibt normal bedienbar
+- Bei korrekter PIN gibt das System eine Bestätigungsmeldung aus und startet unmittelbar neu
+- Der Befehl ist nur im eingeloggten Zustand ausführbar (SHL-REQ-06)
+
+---
+
 ## 3. Nicht-funktionale Anforderungen
 
 ### SHL-NFR-01
@@ -361,3 +388,5 @@ Eine ungültige Eingabe in der Shell darf nicht zum Absturz oder undefinierten V
 | 1.9     | 2026-05-27 |       | SHL-REQ-02 überarbeitet: Passwort wird interaktiv mit `Passwort:`-Prompt und `*`-Verdeckung abgefragt statt als Argument übergeben |
 | 2.0     | 2026-05-27 |       | SHL-REQ-09 ergänzt: `wifi status`-Befehl zur Anzeige des WiFi-Verbindungsstatus |
 | 2.1     | 2026-06-14 |       | SHL-REQ-10 ergänzt: Softwareversionsnummer in der Bootmeldung |
+| 2.2     | 2026-06-17 |       | SHL-REQ-11 ergänzt: `reboot`-Befehl mit PIN-Bestätigung für Systemneustart |
+| 2.3     | 2026-06-17 |       | SHL-REQ-11 Status auf „Umgesetzt" gesetzt; Implementierung eingetragen |

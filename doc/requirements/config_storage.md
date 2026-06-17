@@ -2,7 +2,7 @@
 
 ## 1. Übersicht
 
-Die Systemkonfiguration (WiFi, MQTT, Systemparameter) soll dauerhaft in einem nichtflüchtigen Speicher abgelegt werden, sodass sie nach einem Neustart oder Stromausfall erhalten bleibt. Als Speichermedium wird der interne Flash-Speicher des ESP32-S3 über das Zephyr NVS-Subsystem (Non-Volatile Storage) genutzt.
+Die Systemkonfiguration (WiFi, Systemparameter) soll dauerhaft in einem nichtflüchtigen Speicher abgelegt werden, sodass sie nach einem Neustart oder Stromausfall erhalten bleibt. Als Speichermedium wird der interne Flash-Speicher des ESP32-S3 über das Zephyr NVS-Subsystem (Non-Volatile Storage) genutzt.
 
 ---
 
@@ -47,7 +47,7 @@ Das System soll beim Start die gespeicherte Konfiguration automatisch aus dem ni
 
 - Nach einem Neustart sind alle zuvor gespeicherten Parameter ohne Nutzerinteraktion aktiv
 - Fehlt ein Parameter im Speicher, wird ein definierter Standardwert verwendet
-- Der Ladevorgang erfolgt vor der Initialisierung der abhängigen Subsysteme (WiFi, MQTT)
+- Der Ladevorgang erfolgt vor der Initialisierung der abhängigen Subsysteme (WiFi)
 
 ---
 
@@ -89,8 +89,6 @@ Das System soll folgende Konfigurationsparameter persistent speichern:
 | WiFi SSID       | String  | 32 Zeichen  | `[leer]`     | Nein          |
 | WiFi Passwort   | String  | 64 Zeichen  | `[leer]`     | Ja (AES)      |
 | WiFi Hostname   | String  | 63 Zeichen  | `[leer]`     | Nein          |
-| MQTT Broker     | String  | 128 Zeichen | `[leer]`     | Nein          |
-| MQTT Port       | uint16  | —           | `1883`       | Nein          |
 | Shell-PIN       | String  | 4–6 Ziffern | `000000`     | Ja (AES)      |
 | Grill-MAC       | String  | 17 Zeichen (`AA:BB:CC:DD:EE:FF`) | `[leer]` | Nein |
 

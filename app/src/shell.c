@@ -414,55 +414,6 @@ static int Shell_CmdWifiHostname(const struct shell *sh, size_t argc, char **arg
 }
 
 /* ------------------------------------------------------------------ */
-/* mqtt                                                   SHL-REQ-03  */
-/* ------------------------------------------------------------------ */
-
-static int Shell_CmdMqttSet(const struct shell *sh, size_t argc, char **argv)
-{
-    unsigned long portLong;
-    char         *endPtr = NULL;
-    int           rc;
-
-    if (!Shell_CheckAuth(sh)) {
-        return -EACCES;
-    }
-
-    if (argc != 3) {
-        shell_error(sh, "Verwendung: mqtt set <broker> <port>");
-        return -EINVAL;
-    }
-
-    if (strlen(argv[1]) > CFG_MQTT_BROKER_MAX_LEN) {
-        shell_error(sh, "Broker-Adresse zu lang (max. %u Zeichen).",
-                    (unsigned int)CFG_MQTT_BROKER_MAX_LEN);
-        return -EINVAL;
-    }
-
-    portLong = strtoul(argv[2], &endPtr, 10);
-
-    if ((endPtr == argv[2]) || (*endPtr != '\0') || (portLong == 0UL) || (portLong > 65535UL)) {
-        shell_error(sh, "Ungueltiger Port (1-65535).");
-        return -EINVAL;
-    }
-
-    (void)strncpy(g_Config.mqttBroker, argv[1], CFG_MQTT_BROKER_MAX_LEN);
-    g_Config.mqttBroker[CFG_MQTT_BROKER_MAX_LEN] = '\0';
-    g_Config.mqttPort = (uint16_t)portLong;
-
-    rc = Config_Save(&g_Config);
-
-    if (rc < 0) {
-        shell_error(sh, "Speicherfehler: %d", rc);
-        return rc;
-    }
-
-    shell_print(sh, "MQTT Broker gesetzt: %s:%u",
-                g_Config.mqttBroker, (unsigned int)g_Config.mqttPort);
-
-    return 0;
-}
-
-/* ------------------------------------------------------------------ */
 /* config show                                            SHL-REQ-04  */
 /* ------------------------------------------------------------------ */
 
@@ -482,9 +433,6 @@ static int Shell_CmdConfigShow(const struct shell *sh, size_t argc, char **argv)
     shell_print(sh, "WiFi Passwort: ********");
     shell_print(sh, "Hostname     : %s",
                 (g_Config.wifiHostname[0] != '\0') ? g_Config.wifiHostname : "[nicht gesetzt]");
-    shell_print(sh, "MQTT Broker  : %s",
-                (g_Config.mqttBroker[0] != '\0') ? g_Config.mqttBroker : "[nicht gesetzt]");
-    shell_print(sh, "MQTT Port    : %u", (unsigned int)g_Config.mqttPort);
     /* BLE-REQ-07: Grill-MAC im config-show ausgeben */
     shell_print(sh, "Grill MAC    : %s",
                 (g_Config.grillMac[0] != '\0') ? g_Config.grillMac : "[nicht gesetzt]");
@@ -851,11 +799,6 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_wifi,
     SHELL_SUBCMD_SET_END
 );
 
-SHELL_STATIC_SUBCMD_SET_CREATE(sub_mqtt,
-    SHELL_CMD_ARG(set, NULL, "MQTT konfigurieren: <broker> <port>", Shell_CmdMqttSet, 3, 0),
-    SHELL_SUBCMD_SET_END
-);
-
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_config,
     SHELL_CMD(show, NULL, "Konfiguration anzeigen", Shell_CmdConfigShow),
     SHELL_CMD_ARG(pin, NULL, "PIN aendern: <alte-pin> <neue-pin>", Shell_CmdConfigPin, 3, 0),
@@ -1145,7 +1088,6 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_bt,
 
 SHELL_CMD_REGISTER(logout,     NULL,        "Abmelden",                         Shell_CmdLogout);
 SHELL_CMD_REGISTER(wifi,       &sub_wifi,   "WiFi-Konfiguration",               NULL);
-SHELL_CMD_REGISTER(mqtt,       &sub_mqtt,   "MQTT-Konfiguration",               NULL);
 SHELL_CMD_REGISTER(config,     &sub_config, "Systemkonfiguration",              NULL);
 SHELL_CMD_REGISTER(temp,       &sub_temp,   "Temperaturwerte setzen (Test)",    NULL);
 SHELL_CMD_REGISTER(gas,        &sub_gas,    "Gasflaschen-Fuellstand setzen (Test)", NULL);

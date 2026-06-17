@@ -12,7 +12,6 @@ Firmware für die Anzeige der Temperaturen eines Otto Wilde Grills G32. Das Proj
 - Bluetooth-Kommunikation mit dem Grill
 - Anzeige von 4 Brennerbereichen und 4 Thermometern
 - Bereitstellung der Daten über einen Webserver
-- Bereitstellung der Daten über MQTT *(geplant — noch nicht implementiert)*
 - Konfigurationsshell über USB (CDC-ACM)
 
 ### Beispiel der Webanzeige
@@ -51,11 +50,11 @@ ESP32_Grillthermo/
 | `west.yml` | West-Workspace-Manifest. Pinnt Zephyr auf einen festen Commit (reproduzierbarer Build auf allen Rechnern). |
 | `scripts/west-init.sh` | Bootstrap-Script: richtet nach dem Klonen den west-Workspace ein (`west init -l`, `west update`, Blobs). |
 | `app/CMakeLists.txt` | CMake-Konfiguration für das Zephyr-Build-System. Listet alle zu kompilierenden Quelldateien. |
-| `app/prj.conf` | Kconfig-Konfiguration. Aktiviert Zephyr-Module wie Bluetooth, WiFi, MQTT und HTTP-Server. |
+| `app/prj.conf` | Kconfig-Konfiguration. Aktiviert Zephyr-Module wie Bluetooth, WiFi und HTTP-Server. |
 | `app/boards/esp32s3_devkitc_procpu.conf` | Board-spezifische Kconfig-Optionen für das ESP32-S3 DevKitC. |
 | `app/boards/esp32s3_devkitc_procpu.overlay` | DTS-Overlay: leitet Shell und Console auf USB CDC-ACM um. |
 | `app/src/main.c` | Einstiegspunkt der Firmware, initialisiert den USB-Stack. |
-| `app/src/shell.c` | Shell-Kommandos zur Konfiguration von WiFi, MQTT und System. |
+| `app/src/shell.c` | Shell-Kommandos zur Konfiguration von WiFi und System. |
 
 ## Erste Schritte
 
@@ -160,7 +159,6 @@ Verfügbare Kommandos:
 | Kommando | Beschreibung |
 |---|---|
 | `wifi set <ssid> <password>` | WiFi-Zugangsdaten konfigurieren |
-| `mqtt set <broker> <port>` | MQTT-Broker konfigurieren |
 | `config show` | Aktuelle Konfiguration anzeigen |
 | `help` | Alle verfügbaren Kommandos anzeigen |
 

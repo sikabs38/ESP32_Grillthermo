@@ -8,8 +8,6 @@
 #define CFG_WIFI_SSID_MAX_LEN      (32U)
 #define CFG_WIFI_PASS_MAX_LEN      (64U)
 #define CFG_WIFI_HOSTNAME_MAX_LEN  (63U)  /* WIF-REQ-06: Zephyr NET_HOSTNAME_MAX_LEN (range 1-63) */
-#define CFG_MQTT_BROKER_MAX_LEN    (128U)
-#define CFG_MQTT_PORT_DEFAULT      (1883U)
 #define CFG_PIN_MIN_LEN            (4U)
 #define CFG_PIN_MAX_LEN            (6U)
 #define CFG_PIN_BUF_SIZE           (CFG_PIN_MAX_LEN + 1U)
@@ -24,8 +22,6 @@ typedef struct {
     char     wifiSsid[CFG_WIFI_SSID_MAX_LEN + 1U];
     char     wifiPassword[CFG_WIFI_PASS_MAX_LEN + 1U]; /* TODO: CFG-REQ-05 AES */
     char     wifiHostname[CFG_WIFI_HOSTNAME_MAX_LEN + 1U]; /* WIF-REQ-06 */
-    char     mqttBroker[CFG_MQTT_BROKER_MAX_LEN + 1U];
-    uint16_t mqttPort;
     char     pin[CFG_PIN_BUF_SIZE];                    /* TODO: CFG-REQ-05 AES */
     char     grillMac[CFG_GRILL_MAC_BUF_SIZE];         /* BLE-REQ-07 */
 } Config_Data_t;

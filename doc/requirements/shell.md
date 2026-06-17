@@ -2,7 +2,7 @@
 
 ## 1. Übersicht
 
-Die Shell stellt eine interaktive Konfigurationsschnittstelle bereit, die über USB (CDC-ACM) erreichbar ist. Sie ermöglicht die Konfiguration von WiFi, MQTT und Systemparametern ohne erneutes Flashen der Firmware.
+Die Shell stellt eine interaktive Konfigurationsschnittstelle bereit, die über USB (CDC-ACM) erreichbar ist. Sie ermöglicht die Konfiguration von WiFi und Systemparametern ohne erneutes Flashen der Firmware.
 
 ---
 
@@ -56,28 +56,6 @@ Die Shell soll die Konfiguration der WiFi-Zugangsdaten (SSID und Passwort) ermö
 - Nach erfolgreicher Eingabe werden SSID und Passwort gespeichert und eine Bestätigung ausgegeben
 - Ungültige Argumente (fehlende oder zu lange SSID) werden mit einer Fehlermeldung quittiert, ohne den Passwort-Prompt zu starten
 - Die gespeicherten Zugangsdaten werden beim nächsten Start verwendet
-
----
-
-### SHL-REQ-03
-
-#### Beschreibung
-
-Die Shell soll die Konfiguration des MQTT-Brokers (Hostname und Port) ermöglichen.
-
-| Priorität | Status | Implementierung |
-|-----------|--------|-----------------|
-| Hoch      | Umgesetzt | `app/src/shell.c:Shell_CmdMqttSet()` |
-
-#### Abhängigkeiten
-
-- SHL-REQ-01 (Shell über USB)
-
-#### Abnahmekriterien
-
-- Der Befehl `mqtt set <broker> <port>` wird akzeptiert
-- Ungültige Port-Angaben (nicht numerisch, außerhalb 1–65535) werden abgewiesen
-- Die gespeicherten Broker-Daten werden beim nächsten Start verwendet
 
 ---
 

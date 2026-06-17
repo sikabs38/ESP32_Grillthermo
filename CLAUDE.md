@@ -6,7 +6,7 @@ Das Projekt ist eine Firmware für die Anzeige der Temperaturen von einem Otto W
 
 # Hardware
 
-Basis ist ein ESP32-S3 DevKitC Board. Die Daten werden von einem Webserver bereit gestellt. Zusätzlich werden die Daten über einem MQTT Server zur Verfügung gestellt.
+Basis ist ein ESP32-S3 DevKitC Board. Die Daten werden von einem Webserver bereit gestellt.
 
 Die Kommunikation mit dem Grill erfolgt über Bluetooth.
 

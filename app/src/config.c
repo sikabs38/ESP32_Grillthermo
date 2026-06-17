@@ -193,7 +193,6 @@ void Config_GetDefaults(Config_Data_t *data)
     }
 
     (void)memset(data, 0, sizeof(Config_Data_t));
-    data->mqttPort = (uint16_t)CFG_MQTT_PORT_DEFAULT;
     (void)strncpy(data->pin, CFG_PIN_DEFAULT, CFG_PIN_BUF_SIZE - 1U);
     data->pin[CFG_PIN_BUF_SIZE - 1U] = '\0';
 }

@@ -56,6 +56,11 @@ static char   g_WifiPassBuf[CFG_WIFI_PASS_MAX_LEN + 1U];
 static size_t g_WifiPassBufLen = 0U;
 /* WIF-REQ-06: Hostname */
 static char   g_WifiHostnameBuf[CFG_WIFI_HOSTNAME_MAX_LEN + 1U];
+/* WIF-REQ-09/10/11: Scan-Auswahl — Ergebnispuffer und Eingabepuffer */
+static const Wifi_ScanResult_t *g_ScanResults     = NULL;
+static uint8_t                  g_ScanResultCount  = 0U;
+static char                     g_SelectBuf[4U];     /* max "16\0" */
+static size_t                   g_SelectBufLen     = 0U;
 
 /* ------------------------------------------------------------------ */
 /* Hilfsfunktionen                                                     */
@@ -629,10 +634,117 @@ static int Shell_LoadConfig(void)
 SYS_INIT(Shell_LoadConfig, APPLICATION, 0);
 
 /* ------------------------------------------------------------------ */
+/* wifi scan — Auswahl-Bypass               WIF-REQ-09/10/11         */
+/* ------------------------------------------------------------------ */
+
+/* WIF-REQ-10/11: Bypass fuer Netzwerkauswahl nach Scan */
+static void Shell_WifiScanSelectBypass(const struct shell *sh, uint8_t *data,
+                                       size_t len, void *user_data)
+{
+    size_t        i;
+    char         *endPtr;
+    unsigned long sel;
+
+    ARG_UNUSED(user_data);
+
+    for (i = 0U; i < len; i++) {
+        uint8_t c = data[i];
+
+        if ((c == (uint8_t)'\r') || (c == (uint8_t)'\n')) {
+            shell_fprintf(sh, SHELL_NORMAL, "\n");
+            g_SelectBuf[g_SelectBufLen] = '\0';
+
+            /* WIF-REQ-11: Abbruch bei leerem Input, '0' oder 'q' */
+            if ((g_SelectBufLen == 0U) ||
+                (strcmp(g_SelectBuf, "0") == 0) ||
+                (strcmp(g_SelectBuf, "q") == 0)) {
+                g_SelectBufLen = 0U;
+                shell_set_bypass(sh, NULL, NULL);
+                shell_print(sh, "WiFi: Auswahl abgebrochen. Konfiguration unveraendert.");
+                return;
+            }
+
+            endPtr = NULL;
+            sel    = strtoul(g_SelectBuf, &endPtr, 10);
+            g_SelectBufLen = 0U;
+
+            if ((endPtr == g_SelectBuf) || (*endPtr != '\0') ||
+                (sel < 1UL) || (sel > (unsigned long)g_ScanResultCount) ||
+                (g_ScanResults == NULL)) {
+                shell_print(sh, "Ungueltige Auswahl.");
+                shell_fprintf(sh, SHELL_NORMAL,
+                              "Netz waehlen (1-%u), 0 = Abbrechen: ",
+                              (unsigned int)g_ScanResultCount);
+                return;
+            }
+
+            /* WIF-REQ-10: Gueltige Auswahl — SSID uebernehmen, Passwort abfragen */
+            (void)strncpy(g_WifiSsidStaging,
+                          g_ScanResults[(uint8_t)(sel - 1UL)].ssid,
+                          CFG_WIFI_SSID_MAX_LEN);
+            g_WifiSsidStaging[CFG_WIFI_SSID_MAX_LEN] = '\0';
+
+            g_WifiPassBufLen = 0U;
+            g_WifiPassBuf[0] = '\0';
+            /* Erst Bypass beenden, dann neuen setzen (Zephyr-Anforderung) */
+            shell_set_bypass(sh, NULL, NULL);
+            (void)shell_obscure_set(sh, true);
+            shell_set_bypass(sh, Shell_WifiPasswordBypass, NULL);
+            shell_fprintf(sh, SHELL_NORMAL, "Passwort: ");
+            return;
+
+        } else if ((c == (uint8_t)'\b') || (c == 0x7fU)) {
+            if (g_SelectBufLen > 0U) {
+                g_SelectBufLen--;
+                shell_fprintf(sh, SHELL_NORMAL, "\b \b");
+            }
+        } else if (g_SelectBufLen < (sizeof(g_SelectBuf) - 1U)) {
+            g_SelectBuf[g_SelectBufLen] = (char)c;
+            g_SelectBufLen++;
+            shell_fprintf(sh, SHELL_NORMAL, "%c", (char)c);
+        } else {
+            /* Eingabepuffer voll; Zeichen verwerfen */
+        }
+    }
+}
+
+/* WIF-REQ-09: Wird aus dem net_mgmt-Thread aufgerufen wenn Scan fertig ist */
+static void Shell_ScanDoneCallback(uint8_t count,
+                                   const Wifi_ScanResult_t *results,
+                                   void *user_data)
+{
+    /* MISRA 11.5: void* auf Shell-Zeiger — sicher, da beim Scan-Start gesetzt */
+    const struct shell *sh = (const struct shell *)user_data;
+    uint8_t             i;
+
+    if ((count == 0U) || (results == NULL)) {
+        shell_print(sh, "WiFi: Kein Netzwerk gefunden.");
+        return;
+    }
+
+    g_ScanResults    = results;
+    g_ScanResultCount = count;
+
+    for (i = 0U; i < count; i++) {
+        shell_print(sh, "[%2u] %-32s  RSSI: %4d dBm  Sicherheit: %s",
+                    (unsigned int)(i + 1U),
+                    results[i].ssid,
+                    (int)results[i].rssi,
+                    Wifi_SecurityStr(results[i].security));
+    }
+
+    g_SelectBufLen = 0U;
+    shell_fprintf(sh, SHELL_NORMAL,
+                  "Netz waehlen (1-%u), 0 = Abbrechen: ",
+                  (unsigned int)count);
+    shell_set_bypass(sh, Shell_WifiScanSelectBypass, NULL);
+}
+
+/* ------------------------------------------------------------------ */
 /* Befehlsbaum                                                        */
 /* ------------------------------------------------------------------ */
 
-/* wifi scan                                              WIF-REQ-08  */
+/* wifi scan                                    WIF-REQ-08/09/10/11  */
 static int Shell_CmdWifiScan(const struct shell *sh, size_t argc, char **argv)
 {
     int rc;
@@ -644,7 +756,8 @@ static int Shell_CmdWifiScan(const struct shell *sh, size_t argc, char **argv)
         return -EACCES;
     }
 
-    rc = Wifi_Scan();
+    /* MISRA 11.8: const-Qualifikation entfernt, da void* kein const erlaubt */
+    rc = Wifi_Scan(Shell_ScanDoneCallback, (void *)sh);
     if (rc == -EBUSY) {
         shell_print(sh, "WiFi: Scan laeuft bereits.");
         return 0;

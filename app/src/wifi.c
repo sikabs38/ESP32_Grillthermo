@@ -39,9 +39,12 @@ static struct net_mgmt_event_callback g_ScanCb;
 static bool     g_ConnectSuccess  = false;
 static bool     g_Connected       = false;
 
-/* WIF-REQ-08: Scan-Zustand */
-static bool     g_ScanActive      = false;
-static uint16_t g_ScanResultCount = 0U;
+/* WIF-REQ-08/09: Scan-Zustand und Ergebnispuffer */
+static bool              g_ScanActive      = false;
+static uint8_t           g_ScanResultCount = 0U;
+static Wifi_ScanResult_t g_ScanResults[WIFI_SCAN_MAX_RESULTS];
+static Wifi_ScanDoneCb_t g_ScanDoneCb      = NULL;
+static void             *g_ScanUserData    = NULL;
 
 /* WIF-REQ-05: Zwischengespeicherter Status fuer Wifi_GetStatus() */
 static char g_CurrentSsid[CFG_WIFI_SSID_MAX_LEN + 1U] = {0};
@@ -114,23 +117,25 @@ static void Wifi_ScanCallback(struct net_mgmt_event_callback *cb,
     if (mgmt_event == NET_EVENT_WIFI_SCAN_RESULT) {
         const struct wifi_scan_result *entry =
             (const struct wifi_scan_result *)cb->info;
-        char ssid[WIFI_SSID_MAX_LEN + 1U];
 
-        (void)memcpy(ssid, entry->ssid, entry->ssid_length);
-        ssid[entry->ssid_length] = '\0';
+        /* WIF-REQ-09: Ueberzaehlige Ergebnisse still verwerfen */
+        if (g_ScanResultCount >= WIFI_SCAN_MAX_RESULTS) {
+            return;
+        }
 
-        LOG_INF("%-32s  RSSI: %4d dBm  Sicherheit: %s",
-                ssid, (int)entry->rssi,
-                wifi_security_txt(entry->security));
+        (void)memcpy(g_ScanResults[g_ScanResultCount].ssid,
+                     entry->ssid, entry->ssid_length);
+        g_ScanResults[g_ScanResultCount].ssid[entry->ssid_length] = '\0';
+        g_ScanResults[g_ScanResultCount].rssi     = entry->rssi;
+        g_ScanResults[g_ScanResultCount].security = entry->security;
         g_ScanResultCount++;
 
     } else if (mgmt_event == NET_EVENT_WIFI_SCAN_DONE) {
-        if (g_ScanResultCount == 0U) {
-            LOG_INF("Kein Netzwerk gefunden.");
-        } else {
-            LOG_INF("Scan abgeschlossen. %u Netz(e) gefunden.", g_ScanResultCount);
-        }
         g_ScanActive = false;
+        /* WIF-REQ-09: Ergebnisse an den Aufrufer uebergeben */
+        if (g_ScanDoneCb != NULL) {
+            g_ScanDoneCb(g_ScanResultCount, g_ScanResults, g_ScanUserData);
+        }
     }
 }
 
@@ -271,7 +276,7 @@ bool Wifi_WaitConnected(k_timeout_t timeout)
 }
 
 /* WIF-REQ-08 */
-int Wifi_Scan(void)
+int Wifi_Scan(Wifi_ScanDoneCb_t cb, void *user_data)
 {
     struct net_if *iface = net_if_get_default();
     int            rc;
@@ -282,6 +287,9 @@ int Wifi_Scan(void)
 
     g_ScanActive      = true;
     g_ScanResultCount = 0U;
+    g_ScanDoneCb      = cb;
+    g_ScanUserData    = user_data;
+    (void)memset(g_ScanResults, 0, sizeof(g_ScanResults));
 
     rc = net_mgmt(NET_REQUEST_WIFI_SCAN, iface, NULL, 0U);
     if (rc != 0) {
@@ -290,6 +298,12 @@ int Wifi_Scan(void)
     }
 
     return 0;
+}
+
+/* WIF-REQ-09 */
+const char *Wifi_SecurityStr(uint8_t security)
+{
+    return wifi_security_txt((enum wifi_security_type)security);
 }
 
 /* WIF-REQ-05 */

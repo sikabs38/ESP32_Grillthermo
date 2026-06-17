@@ -20,3 +20,7 @@ Angezeigt werden die vier Bereiche der Brenner sowie die vier Thermometer.
 # Coding Guidelines
 
 + MISRA C gilt für den Code
+
+# Skills
+
++ Anforderungen werden **immer** mit dem `/req`-Skill erfasst — nie manuell Dateien unter `doc/requirements/` anlegen oder bearbeiten.

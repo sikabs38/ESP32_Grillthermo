@@ -195,6 +195,7 @@ void Config_GetDefaults(Config_Data_t *data)
     (void)memset(data, 0, sizeof(Config_Data_t));
     (void)strncpy(data->pin, CFG_PIN_DEFAULT, CFG_PIN_BUF_SIZE - 1U);
     data->pin[CFG_PIN_BUF_SIZE - 1U] = '\0';
+    data->brightnessStep = 6U; /* STA-REQ-07/09: Stufe 6 = 25 % Standard */
 }
 
 /* CFG-REQ-03: Alle NVS-Slots ungueltig schreiben.

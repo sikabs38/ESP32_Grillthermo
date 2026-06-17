@@ -694,6 +694,9 @@ static int Shell_LoadConfig(void)
         }
     }
 
+    /* STA-REQ-09: Gespeicherte Helligkeitsstufe anwenden */
+    Status_SetBrightness(g_Config.brightnessStep);
+
     /* SHL-REQ-06: Login-Bypass vor erster Nutzereingabe aktivieren */
     sh = shell_backend_uart_get_ptr();
     if (sh != NULL) {
@@ -1332,8 +1335,18 @@ static void Shell_BrightnessBypass(const struct shell *sh, uint8_t *data,
         uint8_t c = data[i];
 
         if ((c == (uint8_t)'q') || (c == (uint8_t)'\r') || (c == (uint8_t)'\n')) {
+            int saveRc;
+
             step = Status_GetBrightness();
             shell_fprintf(sh, SHELL_NORMAL, "\n");
+
+            /* STA-REQ-09: Helligkeitsstufe persistent speichern */
+            g_Config.brightnessStep = step;
+            saveRc = Config_Save(&g_Config);
+            if (saveRc != 0) {
+                shell_error(sh, "Warnung: Helligkeit konnte nicht gespeichert werden (%d).", saveRc);
+            }
+
             shell_print(sh, "Helligkeit gesetzt: Stufe %u/10", (unsigned int)(step + 1U));
             shell_set_bypass(sh, NULL, NULL);
             return;

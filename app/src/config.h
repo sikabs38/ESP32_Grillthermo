@@ -19,11 +19,12 @@
 
 /* CFG-REQ-04: Konfigurationsparameter */
 typedef struct {
-    char     wifiSsid[CFG_WIFI_SSID_MAX_LEN + 1U];
-    char     wifiPassword[CFG_WIFI_PASS_MAX_LEN + 1U]; /* TODO: CFG-REQ-05 AES */
-    char     wifiHostname[CFG_WIFI_HOSTNAME_MAX_LEN + 1U]; /* WIF-REQ-06 */
-    char     pin[CFG_PIN_BUF_SIZE];                    /* TODO: CFG-REQ-05 AES */
-    char     grillMac[CFG_GRILL_MAC_BUF_SIZE];         /* BLE-REQ-07 */
+    char    wifiSsid[CFG_WIFI_SSID_MAX_LEN + 1U];
+    char    wifiPassword[CFG_WIFI_PASS_MAX_LEN + 1U]; /* TODO: CFG-REQ-05 AES */
+    char    wifiHostname[CFG_WIFI_HOSTNAME_MAX_LEN + 1U]; /* WIF-REQ-06 */
+    char    pin[CFG_PIN_BUF_SIZE];                    /* TODO: CFG-REQ-05 AES */
+    char    grillMac[CFG_GRILL_MAC_BUF_SIZE];         /* BLE-REQ-07 */
+    uint8_t brightnessStep;                            /* STA-REQ-09: LED-Helligkeit (0..9) */
 } Config_Data_t;
 
 int  Config_Init(void);

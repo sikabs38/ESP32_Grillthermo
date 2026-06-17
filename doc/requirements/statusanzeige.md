@@ -273,6 +273,31 @@ Ein Shell-Befehl `status brightness` soll die Helligkeit der RGB-LED interaktiv 
 
 ---
 
+### STA-REQ-09
+
+#### Beschreibung
+
+Die eingestellte Helligkeitsstufe soll im Konfigurationsspeicher (NVS) persistent gespeichert werden. Beim Systemstart wird der gespeicherte Wert geladen und als initiale Helligkeit verwendet. Wird kein Wert gefunden (erster Start oder gelöschter Speicher), gilt der Default (Stufe 6 = 25 %). Die Speicherung erfolgt beim Beenden des Shell-Bypass-Modus (`Enter` oder `q`).
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Hoch      | Offen  |                 |
+
+#### Abhängigkeiten
+
+- STA-REQ-07 (Helligkeitsstufen)
+- STA-REQ-08 (Shell-Befehl brightness)
+- CFG-REQ-01 (Konfigurationsspeicher NVS)
+
+#### Abnahmekriterien
+
+- Nach `status brightness` und Beenden mit `Enter` oder `q` wird die gewählte Stufe im NVS gespeichert
+- Nach einem Neustart leuchtet die LED mit der zuletzt gespeicherten Helligkeitsstufe
+- Ist kein Wert im NVS vorhanden, wird Stufe 6 (25 %) verwendet
+- Kein dynamischer Speicher (`malloc`, `free`) im Speicherpfad
+
+---
+
 ## 4. Offene Punkte / Annahmen
 
 - [x] RGB-Werte: Helligkeit auf 25 % Standard reduziert (STA-REQ-07)
@@ -287,3 +312,4 @@ Ein Shell-Befehl `status brightness` soll die Helligkeit der RGB-LED interaktiv 
 | 1.0     | 2026-06-17 |       | Erstellt |
 | 1.1     | 2026-06-17 |       | STA-REQ-04 geändert: Nur WLAN → Cyan dauerhaft (statt blinkend) |
 | 1.2     | 2026-06-17 |       | STA-REQ-07/08 ergänzt: Helligkeit 25 % Standard, Shell-Befehl brightness |
+| 1.3     | 2026-06-17 |       | STA-REQ-09 ergänzt: Helligkeitsstufe persistent im NVS speichern |

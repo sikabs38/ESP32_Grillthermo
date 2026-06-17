@@ -1,9 +1,10 @@
-/* SHL-REQ-01, SHL-REQ-06, SHL-REQ-07, SHL-REQ-08, SHL-REQ-10, SHL-REQ-11: Shell, Login, Bootmeldung, Bootloader, Version, Reboot */
+/* SHL-REQ-01, SHL-REQ-06..08, SHL-REQ-10..11, STA-REQ-08: Shell, Login, Bootmeldung, Bootloader, Version, Reboot, Brightness */
 #include "config.h"
 #include "wifi.h"
 #include "bluetooth.h"
 #include "temp_data.h"
 #include "version.h"
+#include "status.h"
 
 #include <zephyr/kernel.h>
 #include <zephyr/init.h>
@@ -1301,11 +1302,91 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_bt,
     SHELL_SUBCMD_SET_END
 );
 
+/* STA-REQ-08: status brightness                                              */
+/* -------------------------------------------------------------------------- */
+
+static void Shell_BrightnessBarPrint(const struct shell *sh, uint8_t step)
+{
+    char    bar[STATUS_BRIGHTNESS_STEPS + 1U];
+    uint8_t i;
+
+    for (i = 0U; i < STATUS_BRIGHTNESS_STEPS; i++) {
+        bar[i] = (i < (step + 1U)) ? '#' : '.';
+    }
+    bar[STATUS_BRIGHTNESS_STEPS] = '\0';
+
+    shell_fprintf(sh, SHELL_NORMAL,
+                  "\r  [%s]  Stufe %u/10  +/- aendern, Enter/q beenden  ",
+                  bar, (unsigned int)(step + 1U));
+}
+
+static void Shell_BrightnessBypass(const struct shell *sh, uint8_t *data,
+                                   size_t len, void *user_data)
+{
+    size_t  i;
+    uint8_t step;
+
+    ARG_UNUSED(user_data);
+
+    for (i = 0U; i < len; i++) {
+        uint8_t c = data[i];
+
+        if ((c == (uint8_t)'q') || (c == (uint8_t)'\r') || (c == (uint8_t)'\n')) {
+            step = Status_GetBrightness();
+            shell_fprintf(sh, SHELL_NORMAL, "\n");
+            shell_print(sh, "Helligkeit gesetzt: Stufe %u/10", (unsigned int)(step + 1U));
+            shell_set_bypass(sh, NULL, NULL);
+            return;
+        }
+
+        if (c == (uint8_t)'+') {
+            step = Status_GetBrightness();
+            if (step < (STATUS_BRIGHTNESS_STEPS - 1U)) {
+                Status_SetBrightness(step + 1U);
+            }
+            Shell_BrightnessBarPrint(sh, Status_GetBrightness());
+        } else if (c == (uint8_t)'-') {
+            step = Status_GetBrightness();
+            if (step > 0U) {
+                Status_SetBrightness(step - 1U);
+            }
+            Shell_BrightnessBarPrint(sh, Status_GetBrightness());
+        } else {
+            /* Andere Tasten ignorieren */
+        }
+    }
+}
+
+static int Shell_CmdStatusBrightness(const struct shell *sh, size_t argc, char **argv)
+{
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+
+    if (!Shell_CheckAuth(sh)) {
+        return -EACCES;
+    }
+
+    Shell_BrightnessBarPrint(sh, Status_GetBrightness());
+    shell_set_bypass(sh, Shell_BrightnessBypass, NULL);
+
+    return 0;
+}
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_status,
+    SHELL_CMD(brightness, NULL,
+              "LED-Helligkeit interaktiv einstellen (+/-; Enter/q beenden)",
+              Shell_CmdStatusBrightness),
+    SHELL_SUBCMD_SET_END
+);
+
+/* -------------------------------------------------------------------------- */
+
 SHELL_CMD_REGISTER(logout,     NULL,        "Abmelden",                         Shell_CmdLogout);
 SHELL_CMD_REGISTER(wifi,       &sub_wifi,   "WiFi-Konfiguration",               NULL);
 SHELL_CMD_REGISTER(config,     &sub_config, "Systemkonfiguration",              NULL);
 SHELL_CMD_REGISTER(temp,       &sub_temp,   "Temperaturwerte setzen (Test)",    NULL);
 SHELL_CMD_REGISTER(gas,        &sub_gas,    "Gasflaschen-Fuellstand setzen (Test)", NULL);
 SHELL_CMD_REGISTER(bt,         &sub_bt,     "Bluetooth-Kopplung mit Otto Wilde G32", NULL);
+SHELL_CMD_REGISTER(status,     &sub_status, "Statusanzeige-Einstellungen",      NULL);
 SHELL_CMD_REGISTER(bootloader, NULL,        "In Download-Modus wechseln",       Shell_CmdBootloader);
 SHELL_CMD_REGISTER(reboot,     NULL,        "System neu starten",               Shell_CmdReboot);

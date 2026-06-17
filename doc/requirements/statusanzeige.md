@@ -210,9 +210,72 @@ Die Statusanzeige soll auf einen Zustandswechsel innerhalb von 500 ms reagieren.
 
 ---
 
+### STA-REQ-07
+
+#### Beschreibung
+
+Die Standard-Helligkeit der RGB-LED soll 25 % betragen. Die Helligkeit wird als Skalierungsfaktor auf alle Farbwerte angewendet. Die Helligkeitsstufen sind logarithmisch verteilt (10 Stufen, Stufe 0 = minimal, Stufe 9 = 100 %). Stufe 6 entspricht 25 % (Wert 64/255).
+
+**Helligkeitstabelle (logarithmisch, Faktor ≈ ×1,585 pro Stufe):**
+
+| Stufe | Wert (0–255) | Prozent |
+|-------|-------------|---------|
+| 0     | 4           | 1,6 %   |
+| 1     | 6           | 2,4 %   |
+| 2     | 10          | 3,9 %   |
+| 3     | 16          | 6,3 %   |
+| 4     | 25          | 9,8 %   |
+| 5     | 40          | 15,7 %  |
+| 6     | 64          | 25,1 %  |
+| 7     | 101         | 39,6 %  |
+| 8     | 160         | 62,7 %  |
+| 9     | 255         | 100 %   |
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Hoch      | Offen  |                 |
+
+#### Abhängigkeiten
+
+- STA-REQ-01 (Initialisierung)
+
+#### Abnahmekriterien
+
+- Nach dem Start leuchtet die LED mit Helligkeitsstufe 6 (25 %)
+- Die Helligkeit wird als Skalierungsfaktor auf alle Farbkanäle angewendet: `kanal_out = (kanal_voll * faktor) / 255`
+- Keine Floating-Point-Arithmetik
+
+---
+
+### STA-REQ-08
+
+#### Beschreibung
+
+Ein Shell-Befehl `status brightness` soll die Helligkeit der RGB-LED interaktiv einstellbar machen. Nach dem Aufruf wechselt die Shell in einen Bypass-Modus. Die Taste `+` erhöht die Helligkeitsstufe um 1, `-` verringert sie um 1. Die Änderung ist sofort an der LED sichtbar. Eine Balkenanzeige gibt visuelles Feedback zur aktuellen Stufe. `Enter` oder `q` beendet den Modus und gibt die gewählte Stufe aus.
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Hoch      | Offen  |                 |
+
+#### Abhängigkeiten
+
+- STA-REQ-07 (Helligkeitsstufen)
+- STA-REQ-06 (Update-API)
+
+#### Abnahmekriterien
+
+- `status brightness` aktiviert den Bypass-Modus mit Hinweistext
+- `+` erhöht die Stufe um 1 (Maximum: Stufe 9), `-` verringert um 1 (Minimum: Stufe 0)
+- Nach jedem Tastendruck aktualisiert sich die Balkenanzeige: `[####......]  Stufe 7/10`
+- Die LED ändert ihre Helligkeit sofort bei jedem Tastendruck
+- `Enter` oder `q` beendet den Bypass, gibt Stufe und Prozentwert aus
+- Der Befehl ist nach Login zugänglich (Auth-Pflicht)
+
+---
+
 ## 4. Offene Punkte / Annahmen
 
-- [ ] RGB-Werte (insbesondere für Orange und Weiß) müssen bei der Implementierung auf der Hardware auf gute Erkennbarkeit bei direktem Licht abgestimmt werden (Helligkeit ggf. reduzieren)
+- [x] RGB-Werte: Helligkeit auf 25 % Standard reduziert (STA-REQ-07)
 - [ ] Bluetooth-Verbindungsstatus-API noch nicht definiert — Abhängigkeit zu einem zukünftigen BT-Modul
 
 ---
@@ -223,3 +286,4 @@ Die Statusanzeige soll auf einen Zustandswechsel innerhalb von 500 ms reagieren.
 |---------|------------|-------|----------|
 | 1.0     | 2026-06-17 |       | Erstellt |
 | 1.1     | 2026-06-17 |       | STA-REQ-04 geändert: Nur WLAN → Cyan dauerhaft (statt blinkend) |
+| 1.2     | 2026-06-17 |       | STA-REQ-07/08 ergänzt: Helligkeit 25 % Standard, Shell-Befehl brightness |

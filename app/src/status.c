@@ -1,4 +1,4 @@
-/* STA-REQ-01..06, STA-NFR-01..03: RGB-LED Statusanzeige */
+/* STA-REQ-01..08, STA-NFR-01..03: RGB-LED Statusanzeige */
 #include "status.h"
 #include "wifi.h"
 #include "bluetooth.h"
@@ -22,16 +22,52 @@ static const struct led_rgb COLOR_BLUE   = { .r = 0U,   .g = 0U,   .b = 255U };
 static const struct led_rgb COLOR_CYAN   = { .r = 0U,   .g = 255U, .b = 255U };
 static const struct led_rgb COLOR_WHITE  = { .r = 255U, .g = 255U, .b = 255U };
 
+/* STA-REQ-07: Logarithmische Helligkeitstabelle (10 Stufen, Faktor ~1.585 pro Stufe) */
+static const uint8_t STATUS_BRIGHTNESS_TABLE[STATUS_BRIGHTNESS_STEPS] = {
+    4U, 6U, 10U, 16U, 25U, 40U, 64U, 101U, 160U, 255U
+};
+/* STA-REQ-07: Standard-Helligkeit Stufe 6 = 64/255 = 25 % */
+static uint8_t g_BrightnessStep = STATUS_BRIGHTNESS_DEFAULT;
+
 static const struct device *g_LedDev = NULL;
 static struct led_rgb        g_Pixel[1];
+static const struct led_rgb *g_CurrentColor = NULL;
 
 static void Status_SetLed(const struct led_rgb *color)
 {
+    uint8_t factor;
+
     if (g_LedDev == NULL) {
         return;
     }
-    g_Pixel[0] = *color;
+
+    g_CurrentColor = color;
+    factor = STATUS_BRIGHTNESS_TABLE[g_BrightnessStep];
+
+    /* STA-REQ-07: Helligkeit skalieren ohne Floating-Point */
+    g_Pixel[0].r = (uint8_t)(((uint16_t)color->r * (uint16_t)factor) / 255U);
+    g_Pixel[0].g = (uint8_t)(((uint16_t)color->g * (uint16_t)factor) / 255U);
+    g_Pixel[0].b = (uint8_t)(((uint16_t)color->b * (uint16_t)factor) / 255U);
+
     (void)led_strip_update_rgb(g_LedDev, g_Pixel, 1U);
+}
+
+/* STA-REQ-08: Helligkeitsstufe setzen und LED sofort aktualisieren */
+void Status_SetBrightness(uint8_t step)
+{
+    if (step >= STATUS_BRIGHTNESS_STEPS) {
+        return;
+    }
+    g_BrightnessStep = step;
+    if (g_CurrentColor != NULL) {
+        Status_SetLed(g_CurrentColor);
+    }
+}
+
+/* STA-REQ-08: Aktuelle Helligkeitsstufe abfragen */
+uint8_t Status_GetBrightness(void)
+{
+    return g_BrightnessStep;
 }
 
 /* STA-REQ-06 */

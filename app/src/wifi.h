@@ -1,4 +1,4 @@
-/* WIF-REQ-01, WIF-REQ-02, WIF-REQ-03, WIF-REQ-04, WIF-REQ-05 */
+/* WIF-REQ-01, WIF-REQ-02, WIF-REQ-03, WIF-REQ-04, WIF-REQ-05, WIF-REQ-08 */
 #ifndef APP_WIFI_H
 #define APP_WIFI_H
 
@@ -24,5 +24,10 @@ void Wifi_GetStatus(Wifi_Status_t *status);
  * Gibt true zurueck wenn verbunden, false bei Timeout.
  * Gedacht fuer Module, die erst nach WiFi-Verbindung starten sollen (z.B. Bluetooth). */
 bool Wifi_WaitConnected(k_timeout_t timeout);
+
+/* WIF-REQ-08: Scan nach verfuegbaren WLAN-Netzen starten.
+ * Ergebnisse werden asynchron per LOG_INF ausgegeben.
+ * Gibt 0 bei Erfolg, -EBUSY wenn bereits ein Scan laeuft, -EIO bei Fehler. */
+int Wifi_Scan(void);
 
 #endif /* APP_WIFI_H */

@@ -1,4 +1,4 @@
-/* WIF-REQ-01, WIF-REQ-02, WIF-REQ-03, WIF-REQ-04, WIF-REQ-06: WiFi-Verbindungsverwaltung */
+/* WIF-REQ-01, WIF-REQ-02, WIF-REQ-03, WIF-REQ-04, WIF-REQ-06, WIF-REQ-08: WiFi-Verbindungsverwaltung */
 #include "wifi.h"
 #include "config.h"
 
@@ -34,9 +34,14 @@ static K_SEM_DEFINE(g_ConnectedOnceSem, 0, 1);
 
 static struct net_mgmt_event_callback g_WifiCb;
 static struct net_mgmt_event_callback g_IpCb;
+static struct net_mgmt_event_callback g_ScanCb;
 
-static bool g_ConnectSuccess = false;
-static bool g_Connected      = false;
+static bool     g_ConnectSuccess  = false;
+static bool     g_Connected       = false;
+
+/* WIF-REQ-08: Scan-Zustand */
+static bool     g_ScanActive      = false;
+static uint16_t g_ScanResultCount = 0U;
 
 /* WIF-REQ-05: Zwischengespeicherter Status fuer Wifi_GetStatus() */
 static char g_CurrentSsid[CFG_WIFI_SSID_MAX_LEN + 1U] = {0};
@@ -98,6 +103,38 @@ static void Wifi_IpCallback(struct net_mgmt_event_callback *cb,
 }
 
 /* ------------------------------------------------------------------ */
+/* Scan-Callback                                          WIF-REQ-08  */
+/* ------------------------------------------------------------------ */
+
+static void Wifi_ScanCallback(struct net_mgmt_event_callback *cb,
+                              uint64_t mgmt_event, struct net_if *iface)
+{
+    ARG_UNUSED(iface);
+
+    if (mgmt_event == NET_EVENT_WIFI_SCAN_RESULT) {
+        const struct wifi_scan_result *entry =
+            (const struct wifi_scan_result *)cb->info;
+        char ssid[WIFI_SSID_MAX_LEN + 1U];
+
+        (void)memcpy(ssid, entry->ssid, entry->ssid_length);
+        ssid[entry->ssid_length] = '\0';
+
+        LOG_INF("%-32s  RSSI: %4d dBm  Sicherheit: %s",
+                ssid, (int)entry->rssi,
+                wifi_security_txt(entry->security));
+        g_ScanResultCount++;
+
+    } else if (mgmt_event == NET_EVENT_WIFI_SCAN_DONE) {
+        if (g_ScanResultCount == 0U) {
+            LOG_INF("Kein Netzwerk gefunden.");
+        } else {
+            LOG_INF("Scan abgeschlossen. %u Netz(e) gefunden.", g_ScanResultCount);
+        }
+        g_ScanActive = false;
+    }
+}
+
+/* ------------------------------------------------------------------ */
 /* WiFi-Thread                                            WIF-REQ-02  */
 /* ------------------------------------------------------------------ */
 
@@ -120,6 +157,11 @@ static void Wifi_Thread(void *p1, void *p2, void *p3)
     net_mgmt_init_event_callback(&g_IpCb, Wifi_IpCallback,
         NET_EVENT_IPV4_ADDR_ADD);
     net_mgmt_add_event_callback(&g_IpCb);
+
+    /* WIF-REQ-08: Scan-Events registrieren */
+    net_mgmt_init_event_callback(&g_ScanCb, Wifi_ScanCallback,
+        NET_EVENT_WIFI_SCAN_RESULT | NET_EVENT_WIFI_SCAN_DONE);
+    net_mgmt_add_event_callback(&g_ScanCb);
 
     iface = net_if_get_default();
 
@@ -226,6 +268,28 @@ bool Wifi_WaitConnected(k_timeout_t timeout)
     /* Semaphor direkt zurueckgeben, damit weitere Aufrufer nicht blockieren */
     (void)k_sem_give(&g_ConnectedOnceSem);
     return true;
+}
+
+/* WIF-REQ-08 */
+int Wifi_Scan(void)
+{
+    struct net_if *iface = net_if_get_default();
+    int            rc;
+
+    if (g_ScanActive) {
+        return -EBUSY;
+    }
+
+    g_ScanActive      = true;
+    g_ScanResultCount = 0U;
+
+    rc = net_mgmt(NET_REQUEST_WIFI_SCAN, iface, NULL, 0U);
+    if (rc != 0) {
+        g_ScanActive = false;
+        return -EIO;
+    }
+
+    return 0;
 }
 
 /* WIF-REQ-05 */

@@ -632,6 +632,32 @@ SYS_INIT(Shell_LoadConfig, APPLICATION, 0);
 /* Befehlsbaum                                                        */
 /* ------------------------------------------------------------------ */
 
+/* wifi scan                                              WIF-REQ-08  */
+static int Shell_CmdWifiScan(const struct shell *sh, size_t argc, char **argv)
+{
+    int rc;
+
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+
+    if (!Shell_CheckAuth(sh)) {
+        return -EACCES;
+    }
+
+    rc = Wifi_Scan();
+    if (rc == -EBUSY) {
+        shell_print(sh, "WiFi: Scan laeuft bereits.");
+        return 0;
+    }
+    if (rc != 0) {
+        shell_error(sh, "WiFi: Scan konnte nicht gestartet werden (%d).", rc);
+        return rc;
+    }
+
+    shell_print(sh, "WiFi: Scan gestartet...");
+    return 0;
+}
+
 static int Shell_CmdWifiReconnect(const struct shell *sh, size_t argc, char **argv)
 {
     ARG_UNUSED(argc);
@@ -796,6 +822,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_wifi,
     SHELL_CMD_ARG(hostname, NULL, "Hostnamen setzen: <name>",         Shell_CmdWifiHostname, 2, 0),
     SHELL_CMD_ARG(reconnect,NULL, "WiFi-Verbindung neu aufbauen",     Shell_CmdWifiReconnect,1, 0),
     SHELL_CMD(    status,   NULL, "WiFi-Status anzeigen",             Shell_CmdWifiStatus),
+    SHELL_CMD(    scan,     NULL, "Verfuegbare WLAN-Netze anzeigen",  Shell_CmdWifiScan),
     SHELL_SUBCMD_SET_END
 );
 

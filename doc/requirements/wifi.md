@@ -219,6 +219,32 @@ Das WiFi-Modul soll nach einem fehlgeschlagenen Verbindungsversuch oder nach Ver
 
 ---
 
+### WIF-REQ-08
+
+#### Beschreibung
+
+Das WiFi-Modul soll auf Anforderung verfügbare WLAN-Netzwerke scannen und die Ergebnisse ausgeben. Der Scan wird über einen Shell-Befehl ausgelöst und läuft asynchron, ohne den WiFi-Thread oder andere Module zu blockieren. Jedes gefundene Netzwerk wird mit SSID, Signalstärke (RSSI) und Sicherheitstyp angezeigt.
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Mittel    | Offen  |                 |
+
+#### Abhängigkeiten
+
+- WIF-REQ-02 (Thread)
+- SHL-REQ-01 (Shell über USB)
+
+#### Abnahmekriterien
+
+- Der Shell-Befehl `wifi scan` startet einen Scan-Vorgang
+- Der Scan blockiert nicht den Shell-Thread; die Ergebnisse erscheinen sobald der Scan abgeschlossen ist
+- Jedes gefundene Netzwerk wird in einer Zeile ausgegeben: `<SSID>  RSSI: <dBm>  Sicherheit: <Typ>`
+- Wird kein Netzwerk gefunden, erscheint die Meldung: `WiFi: Kein Netzwerk gefunden.`
+- Ist ein Scan bereits aktiv, erscheint die Meldung: `WiFi: Scan läuft bereits.`
+- Die Ergebnisliste verwendet ausschließlich statisch allozierte Puffer (kein `malloc`)
+
+---
+
 ## 4. Offene Punkte / Annahmen
 
 Keine.
@@ -234,3 +260,4 @@ Keine.
 | 1.2     | 2026-05-28 |       | WIF-REQ-06 ergänzt: Konfigurierbarer Hostname |
 | 1.3     | 2026-05-28 |       | WIF-REQ-06 umgesetzt |
 | 1.4     | 2026-06-14 |       | WIF-REQ-07 ergänzt und umgesetzt: automatische Wiederverbindung |
+| 1.5     | 2026-06-17 |       | WIF-REQ-08 ergänzt: WiFi-Scan-Funktion |

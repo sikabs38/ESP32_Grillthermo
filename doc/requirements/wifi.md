@@ -219,6 +219,107 @@ Das WiFi-Modul soll nach einem fehlgeschlagenen Verbindungsversuch oder nach Ver
 
 ---
 
+### WIF-REQ-08
+
+#### Beschreibung
+
+Das WiFi-Modul soll auf Anforderung verfügbare WLAN-Netzwerke scannen und die Ergebnisse ausgeben. Der Scan wird über einen Shell-Befehl ausgelöst und läuft asynchron, ohne den WiFi-Thread oder andere Module zu blockieren. Jedes gefundene Netzwerk wird mit SSID, Signalstärke (RSSI) und Sicherheitstyp angezeigt.
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Mittel    | Offen  |                 |
+
+#### Abhängigkeiten
+
+- WIF-REQ-02 (Thread)
+- SHL-REQ-01 (Shell über USB)
+
+#### Abnahmekriterien
+
+- Der Shell-Befehl `wifi scan` startet einen Scan-Vorgang
+- Der Scan blockiert nicht den Shell-Thread; die Ergebnisse erscheinen sobald der Scan abgeschlossen ist
+- Jedes gefundene Netzwerk wird in einer Zeile ausgegeben: `<SSID>  RSSI: <dBm>  Sicherheit: <Typ>`
+- Wird kein Netzwerk gefunden, erscheint die Meldung: `WiFi: Kein Netzwerk gefunden.`
+- Ist ein Scan bereits aktiv, erscheint die Meldung: `WiFi: Scan läuft bereits.`
+- Die Ergebnisliste verwendet ausschließlich statisch allozierte Puffer (kein `malloc`)
+
+---
+
+### WIF-REQ-09
+
+#### Beschreibung
+
+Nach Abschluss eines Scans soll das Ergebnis als nummerierte Auswahlliste auf der seriellen Konsole ausgegeben werden. Die Scan-Ergebnisse werden in einem statischen Puffer gespeichert (maximal 16 Einträge; weitere Netze werden verworfen). Anschließend wird die Shell in einen Bypass-Modus versetzt, der eine Zifferneingabe zur Netzwerkauswahl erwartet.
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Mittel    | Offen  |                 |
+
+#### Abhängigkeiten
+
+- WIF-REQ-08 (Scan)
+- SHL-REQ-01 (Shell über USB)
+
+#### Abnahmekriterien
+
+- Jedes gefundene Netzwerk wird nummeriert ausgegeben: `[<Nr>] <SSID>  RSSI: <dBm>  Sicherheit: <Typ>`
+- Nach der Liste erscheint die Aufforderung: `Netz waehlen (1-<N>), 0 = Abbrechen:`
+- Es werden maximal 16 Netze gepuffert und angezeigt; überzählige Scan-Ergebnisse werden still verworfen
+- Die Shell nimmt nach der Ausgabe keine normalen Befehle mehr entgegen, bis die Auswahl abgeschlossen oder abgebrochen ist
+- Wird kein Netzwerk gefunden, erscheint wie in WIF-REQ-08 die Meldung `WiFi: Kein Netzwerk gefunden.` und kein Auswahlmodus wird aktiviert
+
+---
+
+### WIF-REQ-10
+
+#### Beschreibung
+
+Gibt der Benutzer im Auswahlmodus eine gültige Netzwerknummer ein, soll die SSID des gewählten Netzes als neue WLAN-Konfiguration übernommen werden. Anschließend wird — analog zu `wifi set` — nach dem Passwort gefragt. Nach Bestätigung wird die Konfiguration gespeichert und ein neuer Verbindungsversuch gestartet. Ungültige Eingaben (außerhalb des gültigen Bereichs, keine Zahl) werden mit einer Fehlermeldung quittiert, die Eingabeaufforderung bleibt aktiv.
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Mittel    | Offen  |                 |
+
+#### Abhängigkeiten
+
+- WIF-REQ-09 (Auswahlliste)
+- WIF-REQ-04 (Wiederverbindung nach Konfigurationsänderung)
+- CFG-REQ-03 (Konfiguration speichern)
+
+#### Abnahmekriterien
+
+- Eingabe einer gültigen Nummer (1 bis N) übernimmt die zugehörige SSID in die Staging-Variable
+- Anschließend erscheint die Passwortabfrage identisch zur Passwortabfrage von `wifi set`; das eingegebene Passwort wird nicht im Klartext angezeigt
+- Nach Passwortbestätigung wird die Konfiguration (SSID + Passwort) persistent gespeichert und `Wifi_Reconnect()` aufgerufen
+- Eingaben außerhalb des gültigen Bereichs oder nicht-numerische Eingaben geben die Meldung `Ungueltige Auswahl.` aus und wiederholen die Eingabeaufforderung
+- Die Funktion verwendet ausschließlich statisch allozierte Puffer
+
+---
+
+### WIF-REQ-11
+
+#### Beschreibung
+
+Im Auswahlmodus soll der Benutzer den Vorgang jederzeit abbrechen können. Die bestehende WLAN-Konfiguration (SSID und Passwort) bleibt dabei vollständig erhalten; es wird kein neuer Verbindungsversuch ausgelöst.
+
+| Priorität | Status | Implementierung |
+|-----------|--------|-----------------|
+| Mittel    | Offen  |                 |
+
+#### Abhängigkeiten
+
+- WIF-REQ-09 (Auswahlliste)
+
+#### Abnahmekriterien
+
+- Eingabe von `0` oder `q` im Auswahlmodus bricht den Vorgang ab
+- Es erscheint die Meldung: `WiFi: Auswahl abgebrochen. Konfiguration unveraendert.`
+- Die Shell kehrt in den normalen Befehlsmodus zurück
+- SSID, Passwort und alle weiteren Konfigurationswerte sind nach dem Abbruch unverändert
+- Es wird kein `Wifi_Reconnect()` aufgerufen
+
+---
+
 ## 4. Offene Punkte / Annahmen
 
 Keine.
@@ -234,3 +335,5 @@ Keine.
 | 1.2     | 2026-05-28 |       | WIF-REQ-06 ergänzt: Konfigurierbarer Hostname |
 | 1.3     | 2026-05-28 |       | WIF-REQ-06 umgesetzt |
 | 1.4     | 2026-06-14 |       | WIF-REQ-07 ergänzt und umgesetzt: automatische Wiederverbindung |
+| 1.5     | 2026-06-17 |       | WIF-REQ-08 ergänzt: WiFi-Scan-Funktion |
+| 1.6     | 2026-06-17 |       | WIF-REQ-09/10/11 ergänzt: Scan-Auswahl, Konfiguration und Abbruch |
